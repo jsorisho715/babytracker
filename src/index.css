@@ -1,0 +1,88 @@
+@import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800&family=DM+Sans:wght@400;500;600&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    font-family: 'DM Sans', system-ui, sans-serif;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body {
+    @apply bg-cream-100 min-h-screen;
+  }
+
+  * {
+    -webkit-font-smoothing: antialiased;
+  }
+}
+
+@layer components {
+  .font-display {
+    font-family: 'Nunito', system-ui, sans-serif;
+  }
+
+  .card {
+    @apply bg-white rounded-3xl shadow-card p-4;
+  }
+
+  .btn-primary {
+    @apply bg-sage-400 hover:bg-sage-500 text-white font-bold rounded-2xl px-6 py-3 transition-all duration-150 active:scale-95 shadow-soft;
+    font-family: 'Nunito', system-ui, sans-serif;
+  }
+
+  .btn-secondary {
+    @apply bg-cream-200 hover:bg-cream-300 text-warm-gray font-semibold rounded-2xl px-5 py-2.5 transition-all duration-150 active:scale-95;
+    font-family: 'Nunito', system-ui, sans-serif;
+  }
+
+  .player-johnathan {
+    @apply text-sage-500;
+  }
+
+  .player-jordyn {
+    @apply text-rose-medium;
+  }
+
+  .badge-points {
+    @apply inline-flex items-center gap-1 bg-sage-100 text-sage-600 text-xs font-bold rounded-full px-2.5 py-0.5;
+    font-family: 'Nunito', system-ui, sans-serif;
+  }
+
+  .category-chip {
+    @apply inline-flex items-center gap-1 bg-cream-200 text-warm-gray text-xs font-semibold rounded-full px-3 py-1 cursor-pointer transition-colors;
+    font-family: 'Nunito', system-ui, sans-serif;
+  }
+
+  .category-chip-active {
+    @apply bg-sage-400 text-white;
+  }
+}
+
+/* Safe area padding for mobile */
+.pb-safe {
+  padding-bottom: max(1.5rem, env(safe-area-inset-bottom));
+}
+
+.pt-safe {
+  padding-top: max(1rem, env(safe-area-inset-top));
+}
+
+/* Smooth scrolling */
+.scroll-smooth {
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 4px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  @apply bg-cream-300 rounded-full;
+}

@@ -1,0 +1,454 @@
+import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
+import type {
+  Task, ShoppingItem, Goal, Player, PlayerScore, AppSettings, Toast, NavTab, Badge
+} from '../types';
+import { seedTasks, seedShoppingItems, seedGoals, MILESTONE_MESSAGES } from '../data/seedData';
+
+const DEFAULT_SCORES: Record<Player, PlayerScore> = {
+  johnathan: {
+    player: 'johnathan',
+    displayName: 'Johnathan',
+    totalPoints: 0,
+    tasksCompleted: 0,
+    streakDays: 0,
+    badges: [],
+  },
+  jordyn: {
+    player: 'jordyn',
+    displayName: 'Jordyn',
+    totalPoints: 0,
+    tasksCompleted: 0,
+    streakDays: 0,
+    badges: [],
+  },
+};
+
+const DEFAULT_SETTINGS: AppSettings = {
+  babyName: 'Luca',
+  dueDate: undefined,
+};
+
+const BADGES_CATALOG: Badge[] = [
+  { id: 'nursery-ninja', name: 'Nursery Ninja', emoji: '🛏️', description: 'Complete 5 Nursery tasks' },
+  { id: 'hospital-hero', name: 'Hospital Bag Hero', emoji: '🎒', description: 'Complete all Hospital Prep tasks' },
+  { id: 'diaper-dynamo', name: 'Diaper Dynamo', emoji: '🧷', description: 'Complete all Diapering tasks' },
+  { id: 'medical-maven', name: 'Medical Maven', emoji: '🏥', description: 'Complete 5 Medical/Birth tasks' },
+  { id: 'first-hundred', name: 'First 100!', emoji: '💯', description: 'Earn 100 points' },
+  { id: 'shopping-star', name: 'Shopping Star', emoji: '🛒', description: 'Purchase 3 shopping items' },
+  { id: 'boss-slayer', name: 'Boss Slayer', emoji: '👑', description: 'Complete a Boss Level task (100 pts)' },
+  { id: 'streak-3', name: 'On a Roll', emoji: '🔥', description: 'Complete tasks 3 days in a row' },
+];
+
+function checkAndAwardBadges(player: Player, tasks: Task[], shopping: ShoppingItem[], scores: Record<Player, PlayerScore>): Badge[] {
+  const newBadges: Badge[] = [];
+  const existing = scores[player].badges.map(b => b.id);
+
+  const playerTasks = tasks.filter(t => t.completedBy === player && t.status === 'done');
+  const playerShopping = shopping.filter(s => s.purchasedBy === player && s.status === 'Purchased');
+
+  const nurseryDone = playerTasks.filter(t => t.category === 'Nursery').length;
+  const medicalDone = playerTasks.filter(t => t.category === 'Medical / Birth').length;
+  const hospitalDone = playerTasks.filter(t => t.category === 'Hospital Prep' && t.status === 'done').length;
+  const totalHospital = tasks.filter(t => t.category === 'Hospital Prep').length;
+  const diaperDone = playerTasks.filter(t => t.category === 'Diapering').length;
+  const totalDiaper = tasks.filter(t => t.category === 'Diapering').length;
+  const hasBoss = playerTasks.some(t => t.points === 100);
+
+  if (nurseryDone >= 5 && !existing.includes('nursery-ninja')) newBadges.push(BADGES_CATALOG.find(b => b.id === 'nursery-ninja')!);
+  if (hospitalDone >= totalHospital && totalHospital > 0 && !existing.includes('hospital-hero')) newBadges.push(BADGES_CATALOG.find(b => b.id === 'hospital-hero')!);
+  if (diaperDone >= totalDiaper && totalDiaper > 0 && !existing.includes('diaper-dynamo')) newBadges.push(BADGES_CATALOG.find(b => b.id === 'diaper-dynamo')!);
+  if (medicalDone >= 5 && !existing.includes('medical-maven')) newBadges.push(BADGES_CATALOG.find(b => b.id === 'medical-maven')!);
+  if (scores[player].totalPoints >= 100 && !existing.includes('first-hundred')) newBadges.push(BADGES_CATALOG.find(b => b.id === 'first-hundred')!);
+  if (playerShopping.length >= 3 && !existing.includes('shopping-star')) newBadges.push(BADGES_CATALOG.find(b => b.id === 'shopping-star')!);
+  if (hasBoss && !existing.includes('boss-slayer')) newBadges.push(BADGES_CATALOG.find(b => b.id === 'boss-slayer')!);
+
+  return newBadges.filter(Boolean);
+}
+
+function updateStreak(score: PlayerScore): Partial<PlayerScore> {
+  const today = new Date().toDateString();
+  const last = score.lastCompletedDate;
+  if (!last) return { streakDays: 1, lastCompletedDate: today };
+  if (last === today) return {};
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 1);
+  if (last === yesterday.toDateString()) {
+    return { streakDays: score.streakDays + 1, lastCompletedDate: today };
+  }
+  return { streakDays: 1, lastCompletedDate: today };
+}
+
+interface AppState {
+  tasks: Task[];
+  shopping: ShoppingItem[];
+  goals: Goal[];
+  scores: Record<Player, PlayerScore>;
+  settings: AppSettings;
+  activePlayer: Player;
+  activeTab: NavTab;
+  toasts: Toast[];
+  isLoaded: boolean;
+  previousMilestone: number;
+
+  // Actions - tasks
+  loadSeedData: () => void;
+  addTask: (task: Omit<Task, 'id'>) => void;
+  updateTask: (id: string, updates: Partial<Task>) => void;
+  deleteTask: (id: string) => void;
+  claimTask: (id: string) => void;
+  completeTask: (id: string) => void;
+  uncompleteTask: (id: string) => void;
+
+  // Actions - shopping
+  addShoppingItem: (item: Omit<ShoppingItem, 'id'>) => void;
+  updateShoppingItem: (id: string, updates: Partial<ShoppingItem>) => void;
+  deleteShoppingItem: (id: string) => void;
+  purchaseItem: (id: string) => void;
+  unpurchaseItem: (id: string) => void;
+
+  // Actions - goals
+  addGoal: (goal: Omit<Goal, 'id'>) => void;
+  updateGoal: (id: string, updates: Partial<Goal>) => void;
+  deleteGoal: (id: string) => void;
+  completeGoal: (id: string) => void;
+
+  // UI
+  setActivePlayer: (player: Player) => void;
+  setActiveTab: (tab: NavTab) => void;
+  addToast: (toast: Omit<Toast, 'id'>) => void;
+  removeToast: (id: string) => void;
+  updateSettings: (settings: Partial<AppSettings>) => void;
+}
+
+function generateId() {
+  return Math.random().toString(36).slice(2, 10);
+}
+
+function getTotalPoints(scores: Record<Player, PlayerScore>) {
+  return scores.johnathan.totalPoints + scores.jordyn.totalPoints;
+}
+
+export const useStore = create<AppState>()(
+  persist(
+    (set, get) => ({
+      tasks: [],
+      shopping: [],
+      goals: [],
+      scores: DEFAULT_SCORES,
+      settings: DEFAULT_SETTINGS,
+      activePlayer: 'johnathan',
+      activeTab: 'dashboard',
+      toasts: [],
+      isLoaded: false,
+      previousMilestone: 0,
+
+      loadSeedData: () => {
+        const { isLoaded } = get();
+        if (isLoaded) return;
+        set({
+          tasks: seedTasks,
+          shopping: seedShoppingItems,
+          goals: seedGoals,
+          isLoaded: true,
+        });
+      },
+
+      addTask: (taskData) => {
+        const task: Task = { ...taskData, id: generateId() };
+        set(s => ({ tasks: [...s.tasks, task] }));
+      },
+
+      updateTask: (id, updates) => {
+        set(s => {
+          const tasks = s.tasks.map(t => t.id === id ? { ...t, ...updates } : t);
+          // If reverting to pending from done, deduct points
+          const original = s.tasks.find(t => t.id === id);
+          if (original?.status === 'done' && updates.status === 'pending' && original.completedBy) {
+            const player = original.completedBy;
+            const scores = {
+              ...s.scores,
+              [player]: {
+                ...s.scores[player],
+                totalPoints: Math.max(0, s.scores[player].totalPoints - original.points),
+                tasksCompleted: Math.max(0, s.scores[player].tasksCompleted - 1),
+              },
+            };
+            return { tasks, scores };
+          }
+          return { tasks };
+        });
+      },
+
+      deleteTask: (id) => {
+        set(s => {
+          const task = s.tasks.find(t => t.id === id);
+          const tasks = s.tasks.filter(t => t.id !== id);
+          if (task?.status === 'done' && task.completedBy) {
+            const player = task.completedBy;
+            const scores = {
+              ...s.scores,
+              [player]: {
+                ...s.scores[player],
+                totalPoints: Math.max(0, s.scores[player].totalPoints - task.points),
+                tasksCompleted: Math.max(0, s.scores[player].tasksCompleted - 1),
+              },
+            };
+            return { tasks, scores };
+          }
+          return { tasks };
+        });
+      },
+
+      claimTask: (id) => {
+        const { activePlayer } = get();
+        set(s => ({
+          tasks: s.tasks.map(t =>
+            t.id === id && t.status === 'pending'
+              ? { ...t, status: 'claimed', claimedBy: activePlayer }
+              : t
+          ),
+        }));
+      },
+
+      completeTask: (id) => {
+        const { activePlayer, tasks, shopping, scores, previousMilestone } = get();
+        const task = tasks.find(t => t.id === id);
+        if (!task || task.status === 'done') return;
+
+        const now = new Date().toISOString();
+        const streakUpdates = updateStreak(scores[activePlayer]);
+        const newPoints = scores[activePlayer].totalPoints + task.points;
+        const streakBonus = (streakUpdates.streakDays && streakUpdates.streakDays >= 3) ? 5 : 0;
+
+        const updatedTasks = tasks.map(t =>
+          t.id === id ? { ...t, status: 'done' as const, completedBy: activePlayer, completedAt: now, claimedBy: undefined } : t
+        );
+
+        const newScore: PlayerScore = {
+          ...scores[activePlayer],
+          totalPoints: newPoints + streakBonus,
+          tasksCompleted: scores[activePlayer].tasksCompleted + 1,
+          ...streakUpdates,
+        };
+
+        const newBadges = checkAndAwardBadges(activePlayer, updatedTasks, shopping, { ...scores, [activePlayer]: newScore });
+        newScore.badges = [...newScore.badges, ...newBadges.map(b => ({ ...b, unlockedAt: now }))];
+
+        const newScores = { ...scores, [activePlayer]: newScore };
+        const totalNow = getTotalPoints(newScores);
+
+        // Check milestones
+        const nextMilestone = MILESTONE_MESSAGES.find(m => m.points > previousMilestone && m.points <= totalNow);
+
+        set({
+          tasks: updatedTasks,
+          scores: newScores,
+          previousMilestone: nextMilestone ? nextMilestone.points : previousMilestone,
+        });
+
+        // Toast notifications
+        const name = scores[activePlayer].displayName;
+        get().addToast({
+          message: `Nice one, ${name}! +${task.points + streakBonus} pts`,
+          type: 'success',
+          points: task.points + streakBonus,
+          player: activePlayer,
+          taskId: id,
+          canUndo: true,
+        });
+
+        if (newBadges.length > 0) {
+          get().addToast({
+            message: `${newBadges[0].emoji} Badge unlocked: ${newBadges[0].name}!`,
+            type: 'info',
+          });
+        }
+
+        if (nextMilestone) {
+          get().addToast({ message: nextMilestone.message, type: 'info' });
+        }
+
+        if (streakBonus > 0) {
+          get().addToast({ message: `🔥 3-day streak! +${streakBonus} bonus pts`, type: 'info' });
+        }
+      },
+
+      uncompleteTask: (id) => {
+        set(s => {
+          const task = s.tasks.find(t => t.id === id);
+          if (!task || task.status !== 'done' || !task.completedBy) return s;
+          const player = task.completedBy;
+          const tasks = s.tasks.map(t =>
+            t.id === id ? { ...t, status: 'pending' as const, completedBy: undefined, completedAt: undefined } : t
+          );
+          const scores = {
+            ...s.scores,
+            [player]: {
+              ...s.scores[player],
+              totalPoints: Math.max(0, s.scores[player].totalPoints - task.points),
+              tasksCompleted: Math.max(0, s.scores[player].tasksCompleted - 1),
+            },
+          };
+          return { tasks, scores };
+        });
+      },
+
+      addShoppingItem: (itemData) => {
+        const item: ShoppingItem = { ...itemData, id: generateId() };
+        set(s => ({ shopping: [...s.shopping, item] }));
+      },
+
+      updateShoppingItem: (id, updates) => {
+        set(s => {
+          const shopping = s.shopping.map(i => i.id === id ? { ...i, ...updates } : i);
+          const original = s.shopping.find(i => i.id === id);
+          if (original?.status === 'Purchased' && updates.status === 'Need to Purchase' && original.purchasedBy) {
+            const player = original.purchasedBy;
+            const scores = {
+              ...s.scores,
+              [player]: {
+                ...s.scores[player],
+                totalPoints: Math.max(0, s.scores[player].totalPoints - original.points),
+                tasksCompleted: Math.max(0, s.scores[player].tasksCompleted - 1),
+              },
+            };
+            return { shopping, scores };
+          }
+          return { shopping };
+        });
+      },
+
+      deleteShoppingItem: (id) => {
+        set(s => {
+          const item = s.shopping.find(i => i.id === id);
+          const shopping = s.shopping.filter(i => i.id !== id);
+          if (item?.status === 'Purchased' && item.purchasedBy) {
+            const player = item.purchasedBy;
+            const scores = {
+              ...s.scores,
+              [player]: {
+                ...s.scores[player],
+                totalPoints: Math.max(0, s.scores[player].totalPoints - item.points),
+                tasksCompleted: Math.max(0, s.scores[player].tasksCompleted - 1),
+              },
+            };
+            return { shopping, scores };
+          }
+          return { shopping };
+        });
+      },
+
+      purchaseItem: (id) => {
+        const { activePlayer, scores, shopping } = get();
+        const item = shopping.find(i => i.id === id);
+        if (!item || item.status === 'Purchased') return;
+
+        const now = new Date().toISOString();
+        const newPoints = scores[activePlayer].totalPoints + item.points;
+        const updatedShopping = shopping.map(i =>
+          i.id === id ? { ...i, status: 'Purchased' as const, purchasedBy: activePlayer, purchasedAt: now } : i
+        );
+
+        const newScore: PlayerScore = {
+          ...scores[activePlayer],
+          totalPoints: newPoints,
+          tasksCompleted: scores[activePlayer].tasksCompleted + 1,
+        };
+        const newBadges = checkAndAwardBadges(activePlayer, get().tasks, updatedShopping, { ...scores, [activePlayer]: newScore });
+        newScore.badges = [...newScore.badges, ...newBadges.map(b => ({ ...b, unlockedAt: now }))];
+
+        set({ shopping: updatedShopping, scores: { ...scores, [activePlayer]: newScore } });
+
+        const name = scores[activePlayer].displayName;
+        get().addToast({
+          message: `${name} got it! +${item.points} pts`,
+          type: 'success',
+          points: item.points,
+          player: activePlayer,
+          taskId: id,
+          canUndo: true,
+        });
+
+        if (newBadges.length > 0) {
+          get().addToast({
+            message: `${newBadges[0].emoji} Badge unlocked: ${newBadges[0].name}!`,
+            type: 'info',
+          });
+        }
+      },
+
+      unpurchaseItem: (id) => {
+        set(s => {
+          const item = s.shopping.find(i => i.id === id);
+          if (!item || item.status !== 'Purchased' || !item.purchasedBy) return s;
+          const player = item.purchasedBy;
+          const shopping = s.shopping.map(i =>
+            i.id === id ? { ...i, status: 'Need to Purchase' as const, purchasedBy: undefined, purchasedAt: undefined } : i
+          );
+          const scores = {
+            ...s.scores,
+            [player]: {
+              ...s.scores[player],
+              totalPoints: Math.max(0, s.scores[player].totalPoints - item.points),
+              tasksCompleted: Math.max(0, s.scores[player].tasksCompleted - 1),
+            },
+          };
+          return { shopping, scores };
+        });
+      },
+
+      addGoal: (goalData) => {
+        const goal: Goal = { ...goalData, id: generateId() };
+        set(s => ({ goals: [...s.goals, goal] }));
+      },
+
+      updateGoal: (id, updates) => {
+        set(s => ({ goals: s.goals.map(g => g.id === id ? { ...g, ...updates } : g) }));
+      },
+
+      deleteGoal: (id) => {
+        set(s => ({ goals: s.goals.filter(g => g.id !== id) }));
+      },
+
+      completeGoal: (id) => {
+        const { activePlayer } = get();
+        set(s => ({
+          goals: s.goals.map(g =>
+            g.id === id ? { ...g, completed: !g.completed, completedBy: activePlayer, completedAt: new Date().toISOString() } : g
+          ),
+        }));
+      },
+
+      setActivePlayer: (player) => set({ activePlayer: player }),
+      setActiveTab: (tab) => set({ activeTab: tab }),
+
+      addToast: (toast) => {
+        const id = generateId();
+        set(s => ({ toasts: [...s.toasts, { ...toast, id }] }));
+        setTimeout(() => {
+          get().removeToast(id);
+        }, 4500);
+      },
+
+      removeToast: (id) => set(s => ({ toasts: s.toasts.filter(t => t.id !== id) })),
+
+      updateSettings: (updates) => {
+        set(s => ({ settings: { ...s.settings, ...updates } }));
+      },
+    }),
+    {
+      name: 'baby-tracker-store',
+      partialize: (state) => ({
+        tasks: state.tasks,
+        shopping: state.shopping,
+        goals: state.goals,
+        scores: state.scores,
+        settings: state.settings,
+        activePlayer: state.activePlayer,
+        isLoaded: state.isLoaded,
+        previousMilestone: state.previousMilestone,
+      }),
+    }
+  )
+);
