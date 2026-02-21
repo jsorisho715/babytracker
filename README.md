@@ -1,73 +1,83 @@
-# React + TypeScript + Vite
+# Team Luca – Baby Tracker
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A gamified baby preparation and tracking app for Johnathan & Jordyn. Turn your baby prep checklist into a fun competition with points, badges, and milestones.
 
-Currently, two official plugins are available:
+## Features
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+- **Gamification**: Johnathan vs Jordyn leaderboard with 5-tier points (5/10/25/50/100)
+- **74 Pre-loaded Tasks**: All tasks from your Baby Checklist.xlsx with automatic point assignment
+- **Full CRUD**: Add, edit, delete tasks, shopping items, and goals
+- **Claim & Complete**: Tasks can be claimed before completing for tracking
+- **Achievement Badges**: Unlock badges like "Nursery Ninja", "Hospital Bag Hero", "Diaper Dynamo"
+- **Streak Bonuses**: +5 pts for 3-day completion streaks
+- **Team Milestones**: Confetti celebrations at 100, 250, 500, 750, 1000 combined points
+- **LocalStorage Persistence**: Data survives page refresh
+- **Beautiful UI**: Modern elegant baby theme with Nunito font, soft cream + sage palette
+- **Mobile-First**: Responsive design with large touch targets and bottom navigation
 
-## React Compiler
+## Tech Stack
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+- **React 18** + **TypeScript** + **Vite**
+- **Tailwind CSS** for styling
+- **Zustand** for state management with localStorage persistence
+- **Lucide React** for icons
+- **canvas-confetti** for celebrations
 
-## Expanding the ESLint configuration
+## Quick Start
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+### Development
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+cd babytracker
+npm install
+npm run dev
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+Open http://localhost:5173
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+### Build
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+npm run build
+npm run preview
 ```
+
+## Deployment
+
+### Push to GitHub
+
+From your local machine (not in the sandbox):
+
+```bash
+cd "c:\Users\jonat\Baby tracker\babytracker"
+git push -u origin main
+```
+
+When prompted for password, use a [GitHub Personal Access Token](https://github.com/settings/tokens/new) with `repo` scope checked.
+
+### Deploy to Vercel
+
+1. Go to [vercel.com](https://vercel.com)
+2. Click **"Add New Project"**
+3. Select **"Import Git Repository"**
+4. Choose `jsorisho715/babytracker`
+5. Click **"Deploy"**
+
+Vercel will auto-deploy on every push to `main`.
+
+## Data
+
+All 74 tasks from Baby Checklist.xlsx are pre-loaded with:
+
+- **Categories**: Nursery, Baby Clothing, Feeding/Bottle Area, Diapering, Postpartum Recovery, Medical/Birth, Car/Leaving Hospital, Hospital Prep, Admin/Orders, House/Organization, Body Prep, Final Prep, After Baby
+- **Automatic Point Assignment**: Based on Priority (High/Medium/Low) + Timing (ASAP/Week 35/Daily)
+- **Status Tracking**: Claim tasks before completing, track who did what
+
+## Future Phases
+
+- **Phase 4**: Post-birth baby tracker (feeds, sleep, diapers logs)
+- **Phase 5**: Streaks, advanced badges, export, reminders, multi-user sync
+
+## License
+
+Built with 💚 for Team Luca
