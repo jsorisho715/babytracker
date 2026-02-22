@@ -15,6 +15,40 @@ import SettingsModal from './components/SettingsModal';
 
 const SUPABASE_ENABLED = !!import.meta.env.VITE_SUPABASE_URL;
 
+function CountdownBanner() {
+  const { settings } = useStore();
+  const dueDate = settings.dueDate;
+  if (!dueDate) return null;
+
+  const now = new Date();
+  const due = new Date(dueDate + 'T00:00:00');
+  const diffMs = due.getTime() - now.getTime();
+
+  const totalHours = Math.floor(diffMs / (1000 * 60 * 60));
+  const days = Math.floor(totalHours / 24);
+  const hours = totalHours % 24;
+
+  let text: string;
+  if (diffMs > 0) {
+    text = `${days} day${days !== 1 ? 's' : ''}, ${hours} hour${hours !== 1 ? 's' : ''} until ${settings.babyName} arrives!`;
+  } else if (diffMs > -24 * 60 * 60 * 1000) {
+    text = `Today's the day! ${settings.babyName} is coming!`;
+  } else {
+    const agoTotalHours = Math.abs(totalHours);
+    const agoDays = Math.floor(agoTotalHours / 24);
+    const agoHours = agoTotalHours % 24;
+    text = `${agoDays} day${agoDays !== 1 ? 's' : ''}, ${agoHours} hour${agoHours !== 1 ? 's' : ''} past due`;
+  }
+
+  return (
+    <div className="bg-gradient-to-r from-sage-100 to-rose-50 border-b border-cream-200 py-2 px-4">
+      <p className="text-center text-sm font-display font-700 text-gray-800">
+        {text}
+      </p>
+    </div>
+  );
+}
+
 function Header() {
   const { activeTab, settings } = useStore();
   const [showSettings, setShowSettings] = useState(false);
@@ -30,6 +64,7 @@ function Header() {
   return (
     <>
       <header className="sticky top-0 z-30 bg-white/90 backdrop-blur-sm border-b border-cream-200 pt-safe">
+        <CountdownBanner />
         <div className="max-w-lg mx-auto px-4 py-3 flex items-center justify-between gap-3">
           <h1 className="font-display font-800 text-gray-800 text-lg">{titles[activeTab]}</h1>
           <div className="flex items-center gap-2">
