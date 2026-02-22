@@ -281,7 +281,7 @@ function AssignedTaskCard({ task, onEdit }: { task: Task; onEdit: () => void }) 
   );
 }
 
-type AssignedFilter = 'all' | 'to-me' | 'my-tasks';
+type AssignedFilter = 'all' | 'to-me' | 'assigned-by-me';
 
 const byPointsDesc = (a: Task, b: Task) => (b.points ?? 0) - (a.points ?? 0);
 
@@ -291,7 +291,6 @@ export default function Assigned() {
   const [filter, setFilter] = useState<AssignedFilter>('all');
 
   const otherPlayer: Player = activePlayer === 'johnathan' ? 'jordyn' : 'johnathan';
-  const myName = scores[activePlayer].displayName;
   const otherName = scores[otherPlayer].displayName;
 
   // Tasks assigned to me (claimed by me or team tasks), not done
@@ -309,7 +308,7 @@ export default function Assigned() {
 
   const displayed =
     filter === 'to-me' ? toMe :
-    filter === 'my-tasks' ? myTasks :
+    filter === 'assigned-by-me' ? myTasks :
     [...new Map([...toMe, ...myTasks.filter(t => !t.assignedToBoth && t.claimedBy !== activePlayer), ...teamTasks].map(t => [t.id, t])).values()];
 
   const hasAny = toMe.length > 0 || myTasks.length > 0 || teamTasks.length > 0;
@@ -344,13 +343,13 @@ export default function Assigned() {
     <div className="space-y-4">
       {/* Stats */}
       <div className="grid grid-cols-2 gap-3">
-        <div className="card text-center">
-          <p className="text-2xl font-display font-800 text-rose-medium">{toMe.length}</p>
-          <p className="text-xs text-warm-gray font-display font-600">Assigned to me</p>
+        <div className="card text-center min-h-[72px] flex flex-col items-center justify-center">
+          <p className="text-2xl font-display font-800 text-gray-800">{displayed.length}</p>
+          <p className="text-xs text-warm-gray font-display font-600">total assigned</p>
         </div>
-        <div className="card text-center">
-          <p className="text-2xl font-display font-800 text-sage-500">{myTasks.length}</p>
-          <p className="text-xs text-warm-gray font-display font-600">My tasks</p>
+        <div className="card text-center min-h-[72px] flex flex-col items-center justify-center">
+          <p className="text-2xl font-display font-800 text-rose-medium">{toMe.length}</p>
+          <p className="text-xs text-warm-gray font-display font-600">my tasks</p>
         </div>
       </div>
 
@@ -359,8 +358,8 @@ export default function Assigned() {
         <div className="flex gap-1.5 min-w-max">
           {([
             { key: 'all', label: `All (${displayed.length})` },
-            { key: 'to-me', label: `To ${myName} (${toMe.length})` },
-            { key: 'my-tasks', label: `My tasks (${myTasks.length})` },
+            { key: 'to-me', label: `To me (${toMe.length})` },
+            { key: 'assigned-by-me', label: `Assigned by me (${myTasks.length})` },
           ] as { key: AssignedFilter; label: string }[]).map(({ key, label }) => (
             <button
               key={key}

@@ -4,7 +4,7 @@ import { useStore } from '../store/useStore';
 import { CATEGORY_EMOJIS } from '../data/seedData';
 import type { Player, PointTier, Task } from '../types';
 import PointsBadge from '../components/PointsBadge';
-import { Trophy, Flame, Star, ChevronRight, ClipboardList, RefreshCw } from 'lucide-react';
+import { Trophy, Flame, Star, ChevronRight, ClipboardList, RefreshCw, CheckSquare, ShoppingCart, Target, CheckCircle2 } from 'lucide-react';
 
 function PlayerCard({ player }: { player: Player }) {
   const { scores, tasks, shopping } = useStore();
@@ -114,8 +114,21 @@ function AssignedCard() {
   const myName = scores[activePlayer].displayName;
 
   const byPointsDesc = (a: Task, b: Task) => (b.points ?? 0) - (a.points ?? 0);
-  const toMe = tasks.filter(t => t.claimedBy === activePlayer && t.status !== 'done').sort(byPointsDesc);
-  const byMe = tasks.filter(t => t.assignedBy === activePlayer && t.status !== 'done').sort(byPointsDesc);
+
+  // Tasks assigned to me (claimed by me or team tasks)
+  const toMe = tasks.filter(
+    t => t.status !== 'done' && (t.claimedBy === activePlayer || t.assignedToBoth)
+  ).sort(byPointsDesc);
+
+  // Tasks I assigned out to partner
+  const byMe = tasks.filter(t => t.assignedBy === activePlayer && t.status !== 'done');
+
+  // All unique assigned tasks (total)
+  const totalAssigned = new Map(
+    [...toMe, ...byMe.filter(t => !t.assignedToBoth && t.claimedBy !== activePlayer)]
+      .map(t => [t.id, t])
+  ).size;
+
   const hasAny = toMe.length > 0 || byMe.length > 0;
 
   if (!hasAny) {
@@ -152,16 +165,16 @@ function AssignedCard() {
       <div className="grid grid-cols-2 gap-2">
         <button
           onClick={() => setActiveTab('assigned')}
-          className="bg-rose-50 rounded-2xl p-3 text-left"
+          className="bg-cream-100 rounded-2xl p-3 text-left min-h-[60px]"
         >
-          <p className="text-2xl font-display font-800 text-rose-medium">{toMe.length}</p>
-          <p className="text-xs text-warm-gray font-display font-600">assigned to me</p>
+          <p className="text-2xl font-display font-800 text-gray-800">{totalAssigned}</p>
+          <p className="text-xs text-warm-gray font-display font-600">total assigned</p>
         </button>
         <button
           onClick={() => setActiveTab('assigned')}
-          className="bg-sage-50 rounded-2xl p-3 text-left"
+          className="bg-rose-50 rounded-2xl p-3 text-left min-h-[60px]"
         >
-          <p className="text-2xl font-display font-800 text-sage-500">{byMe.length}</p>
+          <p className="text-2xl font-display font-800 text-rose-medium">{toMe.length}</p>
           <p className="text-xs text-warm-gray font-display font-600">my tasks</p>
         </button>
       </div>
@@ -184,6 +197,87 @@ function AssignedCard() {
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+function QuickStats() {
+  const { tasks, shopping, goals, dailyCompletions, activePlayer, setActiveTab } = useStore();
+  const today = new Date().toISOString().slice(0, 10);
+
+  const pendingTasks = tasks.filter(t => t.status !== 'done' && !t.isDaily).length;
+  const completedTasks = tasks.filter(t => t.status === 'done').length;
+  const purchasedShopping = shopping.filter(s => s.status === 'Purchased').length;
+  const completedGoals = goals.filter(g => g.completed).length;
+
+  const dailyTasks = tasks.filter(t =>
+    t.isDaily && (t.assignedToBoth || !t.claimedBy || t.claimedBy === activePlayer)
+  );
+  const doneToday = dailyTasks.filter(t =>
+    dailyCompletions.some(c => c.taskId === t.id && c.date === today)
+  ).length;
+  const dailyLabel = dailyTasks.length > 0 ? `${doneToday}/${dailyTasks.length}` : '—';
+
+  const stats = [
+    {
+      label: 'Pending',
+      value: pendingTasks,
+      icon: <CheckSquare className="w-4 h-4" />,
+      color: 'text-sage-500',
+      bg: 'bg-sage-50',
+      tab: 'tasks' as const,
+    },
+    {
+      label: 'Completed',
+      value: completedTasks,
+      icon: <CheckCircle2 className="w-4 h-4" />,
+      color: 'text-sage-600',
+      bg: 'bg-sage-100',
+      tab: 'tasks' as const,
+    },
+    {
+      label: 'Shopping',
+      value: `${purchasedShopping}/${shopping.length}`,
+      icon: <ShoppingCart className="w-4 h-4" />,
+      color: 'text-rose-medium',
+      bg: 'bg-rose-50',
+      tab: 'shopping' as const,
+    },
+    {
+      label: 'Goals',
+      value: `${completedGoals}/${goals.length}`,
+      icon: <Target className="w-4 h-4" />,
+      color: 'text-amber-500',
+      bg: 'bg-amber-50',
+      tab: 'goals' as const,
+    },
+    {
+      label: 'Daily',
+      value: dailyLabel,
+      icon: <RefreshCw className="w-4 h-4" />,
+      color: 'text-sky-500',
+      bg: 'bg-sky-50',
+      tab: 'tasks' as const,
+    },
+  ];
+
+  return (
+    <div className="grid grid-cols-2 gap-2">
+      {stats.map(({ label, value, icon, color, bg, tab }) => (
+        <button
+          key={label}
+          onClick={() => setActiveTab(tab)}
+          className={`card text-left flex items-center gap-3 py-3 px-3 min-h-[60px] active:scale-95 transition-transform`}
+        >
+          <div className={`w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 ${bg} ${color}`}>
+            {icon}
+          </div>
+          <div className="min-w-0">
+            <p className={`text-xl font-display font-800 leading-none ${color}`}>{value}</p>
+            <p className="text-[11px] text-warm-gray font-display font-600 mt-0.5">{label}</p>
+          </div>
+        </button>
+      ))}
     </div>
   );
 }
@@ -352,6 +446,9 @@ export default function Dashboard() {
               </p>
             )}
           </div>
+
+          {/* Quick Stats */}
+          <QuickStats />
 
           {/* Assigned Card */}
           <AssignedCard />
