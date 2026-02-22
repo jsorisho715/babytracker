@@ -84,7 +84,7 @@ function Header() {
 }
 
 export default function App() {
-  const { activeTab, isLoaded, loadSeedData } = useStore();
+  const { activeTab, isLoaded, loadSeedData, updateSettingsFromSync } = useStore();
 
   useEffect(() => {
     loadSeedData();
@@ -95,18 +95,27 @@ export default function App() {
     if (!SUPABASE_ENABLED) return;
 
     const subscription = supabase
-      .channel('public:tasks')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks' }, (payload) => {
-        console.log('Tasks updated:', payload);
-        // Force refetch by clearing cache
-        loadSeedData();
+      .channel('public:sync')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks' }, () => loadSeedData(true))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'shopping_items' }, () => loadSeedData(true))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'goals' }, () => loadSeedData(true))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'player_scores' }, () => loadSeedData(true))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'app_settings' }, (payload: { new?: { baby_name?: string; due_date?: string | null; pregnancy_week?: number | null } }) => {
+        const row = payload.new;
+        if (row) {
+          updateSettingsFromSync({
+            babyName: row.baby_name ?? 'Luca',
+            dueDate: row.due_date ?? undefined,
+            pregnancyWeek: row.pregnancy_week ?? undefined,
+          });
+        }
       })
       .subscribe();
 
     return () => {
       subscription.unsubscribe();
     };
-  }, [loadSeedData]);
+  }, [loadSeedData, updateSettingsFromSync]);
 
   return (
     <div className="min-h-screen bg-cream-100">

@@ -305,7 +305,7 @@ export default function Dashboard() {
           </h2>
           <p className="text-warm-gray mb-6">Ready to get ready for {settings.babyName}?</p>
           <button
-            onClick={loadSeedData}
+            onClick={() => loadSeedData()}
             className="btn-primary mx-auto"
           >
             Load Checklist ✨

@@ -95,7 +95,7 @@ interface AppState {
   previousMilestone: number;
 
   // Actions - tasks
-  loadSeedData: () => void;
+  loadSeedData: (force?: boolean) => void;
   syncToSupabase: () => Promise<void>;
   addTask: (task: Omit<Task, 'id'>) => void;
   updateTask: (id: string, updates: Partial<Task>) => void;
@@ -134,6 +134,7 @@ interface AppState {
   addToast: (toast: Omit<Toast, 'id'>) => void;
   removeToast: (id: string) => void;
   updateSettings: (settings: Partial<AppSettings>) => void;
+  updateSettingsFromSync: (settings: Partial<AppSettings>) => void;
 }
 
 function generateId() {
@@ -158,9 +159,9 @@ export const useStore = create<AppState>()(
       isLoaded: false,
       previousMilestone: 0,
 
-      loadSeedData: () => {
+      loadSeedData: (force = false) => {
         const { isLoaded } = get();
-        if (isLoaded) return;
+        if (isLoaded && !force) return;
         
         // If Supabase is enabled, try to load from there
         if (SUPABASE_ENABLED) {
@@ -168,10 +169,18 @@ export const useStore = create<AppState>()(
             supabase.from('tasks').select('*'),
             supabase.from('shopping_items').select('*'),
             supabase.from('goals').select('*'),
-            supabase.from('player_scores').select('*')
-          ]).then(([tasksRes, shoppingRes, goalsRes, scoresRes]) => {
-            if (tasksRes.data?.length) {
-              const tasks = tasksRes.data.map(t => ({
+            supabase.from('player_scores').select('*'),
+            supabase.from('app_settings').select('*').eq('id', 'default').maybeSingle()
+          ]).then(([tasksRes, shoppingRes, goalsRes, scoresRes, settingsRes]) => {
+            const settingsRow = settingsRes.data;
+            const settings = settingsRow ? {
+              babyName: settingsRow.baby_name ?? 'Luca',
+              dueDate: settingsRow.due_date ?? undefined,
+              pregnancyWeek: settingsRow.pregnancy_week ?? undefined,
+            } : get().settings;
+
+            if (tasksRes.data?.length || force) {
+              const tasks = (tasksRes.data || []).map(t => ({
                 ...t,
                 points: t.points as any,
                 status: t.status as any,
@@ -186,9 +195,9 @@ export const useStore = create<AppState>()(
                 ...s,
                 points: s.points as any,
                 status: s.status as any
-              })) || [];
-              const goals = goalsRes.data || [];
-              const playerScores = scoresRes.data || [];
+              })) ?? [];
+              const goals = goalsRes.data ?? [];
+              const playerScores = scoresRes.data ?? [];
               
               const mapScore = (raw: any, defaultVal: PlayerScore): PlayerScore => ({
                 ...defaultVal,
@@ -206,10 +215,10 @@ export const useStore = create<AppState>()(
                 jordyn: mapScore(playerScores.find(s => s.player === 'jordyn'), DEFAULT_SCORES.jordyn),
               };
 
-              set({ tasks, shopping, goals, scores, isLoaded: true });
+              set({ tasks, shopping, goals, scores, settings, isLoaded: true });
             } else {
               // No data in Supabase, load seeds and sync
-              set({ tasks: seedTasks, shopping: seedShoppingItems, goals: seedGoals, isLoaded: true });
+              set({ tasks: seedTasks, shopping: seedShoppingItems, goals: seedGoals, settings, isLoaded: true });
               get().syncToSupabase();
             }
           }).catch(() => {
@@ -224,7 +233,7 @@ export const useStore = create<AppState>()(
 
       syncToSupabase: async () => {
         if (!SUPABASE_ENABLED) return;
-        const { tasks, shopping, goals, scores } = get();
+        const { tasks, shopping, goals, scores, settings } = get();
         
         try {
           // Upsert all data to Supabase
@@ -273,7 +282,13 @@ export const useStore = create<AppState>()(
               tasks_completed: s.tasksCompleted,
               streak_days: s.streakDays,
               last_completed_date: s.lastCompletedDate
-            })) as any)
+            })) as any),
+            supabase.from('app_settings').upsert({
+              id: 'default',
+              baby_name: settings.babyName || 'Luca',
+              due_date: settings.dueDate || null,
+              pregnancy_week: settings.pregnancyWeek ?? null,
+            } as any)
           ]);
         } catch (err) {
           console.error('Failed to sync to Supabase:', err);
@@ -826,6 +841,25 @@ export const useStore = create<AppState>()(
       removeToast: (id) => set(s => ({ toasts: s.toasts.filter(t => t.id !== id) })),
 
       updateSettings: (updates) => {
+        set(s => {
+          const next = { ...s.settings, ...updates };
+          if (SUPABASE_ENABLED) {
+            (async () => {
+              try {
+                await supabase.from('app_settings').upsert({
+                  id: 'default',
+                  baby_name: next.babyName || 'Luca',
+                  due_date: next.dueDate || null,
+                  pregnancy_week: next.pregnancyWeek ?? null,
+                } as any);
+              } catch (err: any) { console.error('Supabase settings sync:', err); }
+            })();
+          }
+          return { settings: next };
+        });
+      },
+
+      updateSettingsFromSync: (updates) => {
         set(s => ({ settings: { ...s.settings, ...updates } }));
       },
     }),
