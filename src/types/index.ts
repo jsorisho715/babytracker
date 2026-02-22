@@ -15,6 +15,8 @@ export interface Task {
   claimedBy?: Player;
   assignedBy?: Player;
   completedAt?: string;
+  isDaily?: boolean;
+  assignedToBoth?: boolean;
 }
 
 export interface ShoppingItem {

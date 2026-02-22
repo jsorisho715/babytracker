@@ -102,6 +102,7 @@ interface AppState {
   deleteTask: (id: string) => void;
   claimTask: (id: string) => void;
   assignTask: (taskId: string, assignTo: Player) => void;
+  assignTaskToBoth: (taskId: string) => void;
   unassignTask: (taskId: string) => void;
   completeTask: (id: string) => void;
   uncompleteTask: (id: string) => void;
@@ -178,6 +179,8 @@ export const useStore = create<AppState>()(
                 completedBy: t.completed_by ?? undefined,
                 completedAt: t.completed_at ?? undefined,
                 assignedBy: t.assigned_by ?? undefined,
+                isDaily: t.is_daily ?? false,
+                assignedToBoth: t.assigned_to_both ?? false,
               }));
               const shopping = shoppingRes.data?.map(s => ({
                 ...s,
@@ -238,7 +241,9 @@ export const useStore = create<AppState>()(
               completed_by: t.completedBy,
               claimed_by: t.claimedBy,
               assigned_by: t.assignedBy,
-              completed_at: t.completedAt
+              completed_at: t.completedAt,
+              is_daily: t.isDaily ?? false,
+              assigned_to_both: t.assignedToBoth ?? false,
             })) as any),
             supabase.from('shopping_items').upsert(shopping.map(s => ({
               id: s.id,
@@ -369,13 +374,38 @@ export const useStore = create<AppState>()(
         get().addToast({ message: `Task assigned to ${assigneeName}!`, type: 'info' });
       },
 
-      unassignTask: (taskId) => {
+      assignTaskToBoth: (taskId) => {
         const task = get().tasks.find(t => t.id === taskId);
-        if (!task || task.status === 'pending') return;
+        if (!task || task.status !== 'pending') return;
         set(s => ({
           tasks: s.tasks.map(t =>
             t.id === taskId
-              ? { ...t, status: 'pending' as const, claimedBy: undefined, assignedBy: undefined }
+              ? { ...t, status: 'claimed' as const, assignedToBoth: true, claimedBy: undefined, assignedBy: undefined }
+              : t
+          ),
+        }));
+        if (SUPABASE_ENABLED) {
+          (async () => {
+            try {
+              await supabase.from('tasks').update({
+                status: 'claimed',
+                assigned_to_both: true,
+                claimed_by: null,
+                assigned_by: null,
+              }).eq('id', taskId);
+            } catch (err: any) { console.error('Supabase sync error:', err); }
+          })();
+        }
+        get().addToast({ message: '🤝 Team Luca task! Complete it together.', type: 'info' });
+      },
+
+      unassignTask: (taskId) => {
+        const task = get().tasks.find(t => t.id === taskId);
+        if (!task || (task.status === 'pending' && !task.assignedToBoth)) return;
+        set(s => ({
+          tasks: s.tasks.map(t =>
+            t.id === taskId
+              ? { ...t, status: 'pending' as const, claimedBy: undefined, assignedBy: undefined, assignedToBoth: false }
               : t
           ),
         }));
@@ -386,6 +416,7 @@ export const useStore = create<AppState>()(
                 status: 'pending',
                 claimed_by: null,
                 assigned_by: null,
+                assigned_to_both: false,
               }).eq('id', taskId);
             } catch (err: any) { console.error('Supabase sync error:', err); }
           })();
@@ -697,7 +728,7 @@ export const useStore = create<AppState>()(
           (async () => {
             try {
               await supabase.from('shopping_items').delete().eq('id', itemId);
-              await supabase.from('tasks').insert({ id: newTask.id, task: newTask.task, category: newTask.category, priority: newTask.priority, timing: newTask.timing, status: newTask.status, notes: newTask.notes, points: newTask.points });
+              await supabase.from('tasks').insert({ id: newTask.id, task: newTask.task, category: newTask.category, priority: newTask.priority, timing: newTask.timing, status: newTask.status, notes: newTask.notes, points: newTask.points, is_daily: newTask.isDaily ?? false });
             } catch (err: any) { console.error('Supabase sync error:', err); }
           })();
         }
@@ -749,7 +780,7 @@ export const useStore = create<AppState>()(
           (async () => {
             try {
               await supabase.from('goals').delete().eq('id', goalId);
-              await supabase.from('tasks').insert({ id: newTask.id, task: newTask.task, category: newTask.category, priority: newTask.priority, timing: newTask.timing, status: newTask.status, notes: newTask.notes, points: newTask.points });
+              await supabase.from('tasks').insert({ id: newTask.id, task: newTask.task, category: newTask.category, priority: newTask.priority, timing: newTask.timing, status: newTask.status, notes: newTask.notes, points: newTask.points, is_daily: newTask.isDaily ?? false });
             } catch (err: any) { console.error('Supabase sync error:', err); }
           })();
         }

@@ -20,6 +20,7 @@ function TaskForm({ initial, onSave, onCancel }: TaskFormProps) {
   const [timing, setTiming] = useState(initial?.timing ?? 'ASAP');
   const [notes, setNotes] = useState(initial?.notes ?? '');
   const [points, setPoints] = useState<PointTier>(initial?.points ?? 25);
+  const [isDaily, setIsDaily] = useState(initial?.isDaily ?? false);
 
   const handleSave = () => {
     if (!taskName.trim()) return;
@@ -30,6 +31,7 @@ function TaskForm({ initial, onSave, onCancel }: TaskFormProps) {
       timing,
       notes: notes.trim() || undefined,
       points,
+      isDaily,
       status: initial?.status ?? 'pending',
       completedBy: initial?.completedBy,
       claimedBy: initial?.claimedBy,
@@ -97,6 +99,19 @@ function TaskForm({ initial, onSave, onCancel }: TaskFormProps) {
         placeholder="Notes (optional)"
         className="w-full px-4 py-2.5 bg-cream-100 rounded-xl text-sm font-display font-500 border-none outline-none focus:ring-2 focus:ring-sage-300"
       />
+      {/* Daily toggle */}
+      <button
+        type="button"
+        onClick={() => setIsDaily(v => !v)}
+        className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-display font-600 w-full transition-colors ${
+          isDaily ? 'bg-sage-100 text-sage-600' : 'bg-cream-100 text-warm-gray hover:bg-cream-200'
+        }`}
+      >
+        <span className={`w-4 h-4 rounded border-2 flex items-center justify-center flex-shrink-0 ${isDaily ? 'bg-sage-400 border-sage-400' : 'border-warm-gray'}`}>
+          {isDaily && <span className="text-white text-[10px] font-900">✓</span>}
+        </span>
+        🔄 Repeat daily
+      </button>
       <div className="flex gap-2">
         <button onClick={handleSave} className="btn-primary flex-1 py-2 text-sm">Save</button>
         <button onClick={onCancel} className="btn-secondary flex-1 py-2 text-sm">Cancel</button>
@@ -123,7 +138,7 @@ const PRIORITY_DOT: Record<string, string> = {
 
 function TaskCard({ task, onEdit }: TaskCardProps) {
   const {
-    activePlayer, claimTask, assignTask, unassignTask, completeTask, uncompleteTask,
+    activePlayer, claimTask, assignTask, assignTaskToBoth, unassignTask, completeTask, uncompleteTask,
     deleteTask, convertTaskToShopping, convertTaskToGoal, scores,
   } = useStore();
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -133,12 +148,15 @@ function TaskCard({ task, onEdit }: TaskCardProps) {
 
   const isDone = task.status === 'done';
   const isClaimed = task.status === 'claimed';
+  const isTeam = !!task.assignedToBoth;
   const otherPlayer: Player = activePlayer === 'johnathan' ? 'jordyn' : 'johnathan';
   const otherName = scores[otherPlayer].displayName;
 
   const handlePrimary = () => {
     if (isDone) {
       uncompleteTask(task.id);
+    } else if (isTeam) {
+      completeTask(task.id);
     } else if (isClaimed && task.claimedBy === activePlayer) {
       completeTask(task.id);
     } else if (!isClaimed) {
@@ -146,7 +164,7 @@ function TaskCard({ task, onEdit }: TaskCardProps) {
     }
   };
 
-  const primaryDisabled = isClaimed && task.claimedBy !== activePlayer && !isDone;
+  const primaryDisabled = !isDone && isClaimed && !isTeam && task.claimedBy !== activePlayer;
 
   const isAssigned = !!task.assignedBy;
 
@@ -160,6 +178,8 @@ function TaskCard({ task, onEdit }: TaskCardProps) {
           className={`mt-0.5 w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 transition-all ${
             isDone
               ? 'bg-sage-400 text-white'
+              : isTeam
+              ? 'bg-yellow-100 text-yellow-600 hover:bg-yellow-400 hover:text-white'
               : isClaimed && task.claimedBy === activePlayer
               ? 'bg-sage-100 text-sage-500 hover:bg-sage-400 hover:text-white'
               : isClaimed
@@ -183,8 +203,10 @@ function TaskCard({ task, onEdit }: TaskCardProps) {
             <PointsBadge points={task.points as PointTier} />
           </div>
           {isClaimed && (
-            <p className={`text-xs font-display font-600 mt-0.5 ${task.claimedBy === 'johnathan' ? 'text-sage-500' : 'text-rose-medium'}`}>
-              {isAssigned
+            <p className={`text-xs font-display font-600 mt-0.5 ${isTeam ? 'text-yellow-600' : task.claimedBy === 'johnathan' ? 'text-sage-500' : 'text-rose-medium'}`}>
+              {isTeam
+                ? '🤝 Team Luca — complete together!'
+                : isAssigned
                 ? `📌 Assigned to ${scores[task.claimedBy!].displayName} by ${scores[task.assignedBy!].displayName}`
                 : `🤚 Claimed by ${scores[task.claimedBy!].displayName}`}
             </p>
@@ -219,7 +241,7 @@ function TaskCard({ task, onEdit }: TaskCardProps) {
                 <UserPlus className="w-3.5 h-3.5" />
               </button>
               {showAssign && (
-                <div className="absolute right-0 top-9 z-20 bg-white rounded-2xl shadow-md border border-cream-200 min-w-[160px] overflow-hidden">
+                <div className="absolute right-0 top-9 z-20 bg-white rounded-2xl shadow-md border border-cream-200 min-w-[170px] overflow-hidden">
                   <button
                     onClick={() => { assignTask(task.id, activePlayer); setShowAssign(false); }}
                     className="w-full text-left px-4 py-2.5 text-xs font-display font-600 text-gray-700 hover:bg-cream-100"
@@ -231,6 +253,12 @@ function TaskCard({ task, onEdit }: TaskCardProps) {
                     className="w-full text-left px-4 py-2.5 text-xs font-display font-600 text-gray-700 hover:bg-cream-100"
                   >
                     👥 Assign to {otherName}
+                  </button>
+                  <button
+                    onClick={() => { assignTaskToBoth(task.id); setShowAssign(false); }}
+                    className="w-full text-left px-4 py-2.5 text-xs font-display font-600 text-yellow-700 hover:bg-yellow-50 border-t border-cream-200"
+                  >
+                    🤝 Team task (both)
                   </button>
                 </div>
               )}
@@ -370,11 +398,13 @@ export default function Tasks() {
   const [showAdd, setShowAdd] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
+  const [dailyOnly, setDailyOnly] = useState(false);
 
   const filtered = tasks.filter(t => {
     const statusMatch = filter === 'all' || t.status === filter;
     const catMatch = categoryFilter === 'all' || t.category === categoryFilter;
-    return statusMatch && catMatch;
+    const dailyMatch = !dailyOnly || t.isDaily;
+    return statusMatch && catMatch && dailyMatch;
   });
 
   const categories = [...new Set(tasks.map(t => t.category))];
@@ -429,19 +459,25 @@ export default function Tasks() {
         </button>
       </div>
 
-      {/* Category filter */}
+      {/* Category + Daily filter */}
       <div className="flex gap-1.5 overflow-x-auto pb-0.5">
         <button
           onClick={() => setCategoryFilter('all')}
-          className={`category-chip whitespace-nowrap flex-shrink-0 ${categoryFilter === 'all' ? 'category-chip-active' : ''}`}
+          className={`category-chip whitespace-nowrap flex-shrink-0 ${categoryFilter === 'all' && !dailyOnly ? 'category-chip-active' : ''}`}
         >
           📋 All
+        </button>
+        <button
+          onClick={() => { setDailyOnly(v => !v); setCategoryFilter('all'); }}
+          className={`category-chip whitespace-nowrap flex-shrink-0 ${dailyOnly ? 'category-chip-active' : ''}`}
+        >
+          🔄 Daily
         </button>
         {categories.map(cat => (
           <button
             key={cat}
-            onClick={() => setCategoryFilter(cat)}
-            className={`category-chip whitespace-nowrap flex-shrink-0 ${categoryFilter === cat ? 'category-chip-active' : ''}`}
+            onClick={() => { setCategoryFilter(cat); setDailyOnly(false); }}
+            className={`category-chip whitespace-nowrap flex-shrink-0 ${categoryFilter === cat && !dailyOnly ? 'category-chip-active' : ''}`}
           >
             {CATEGORY_EMOJIS[cat] ?? '📋'} {cat}
           </button>

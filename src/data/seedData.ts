@@ -47,7 +47,7 @@ export const seedTasks: Task[] = [
   { id: 't33', category: 'Medical / Birth', task: 'Order birth comb', priority: 'Medium', timing: 'Week 35', status: 'pending', points: 10 },
   { id: 't34', category: 'Medical / Birth', task: 'Sign up for hypnobirthing class', priority: 'High', timing: 'ASAP', status: 'pending', points: 50 },
   { id: 't35', category: 'Medical / Birth', task: 'Complete hypnobirthing class', priority: 'High', timing: 'Before birth', status: 'pending', points: 100 },
-  { id: 't36', category: 'Medical / Birth', task: 'Practice breathing and relaxation daily', priority: 'Medium', timing: 'Daily', status: 'pending', points: 10 },
+  { id: 't36', category: 'Medical / Birth', task: 'Practice breathing and relaxation daily', priority: 'Medium', timing: 'Daily', status: 'pending', points: 10, isDaily: true },
   { id: 't37', category: 'Medical / Birth', task: 'Learn partner counter pressure techniques', priority: 'Medium', timing: 'Week 35', status: 'pending', points: 25 },
   { id: 't38', category: 'Medical / Birth', task: 'Buy heating/cooling pads for labor support', priority: 'Low', timing: 'Week 35', status: 'pending', points: 10 },
   { id: 't39', category: 'Medical / Birth', task: 'Get rebozo or scarf for hip support', priority: 'Low', timing: 'Week 35', status: 'pending', points: 10 },
@@ -81,10 +81,10 @@ export const seedTasks: Task[] = [
   { id: 't59', category: 'House / Organization', task: 'Hang picture frames', priority: 'Low', timing: 'After birth ok', status: 'pending', points: 5 },
 
   // Body Prep
-  { id: 't60', category: 'Body Prep', task: 'Start eating dates daily', priority: 'Medium', timing: 'Daily', status: 'pending', points: 10 },
-  { id: 't61', category: 'Body Prep', task: 'Start raspberry leaf tea daily', priority: 'Medium', timing: 'Daily', status: 'pending', points: 10 },
+  { id: 't60', category: 'Body Prep', task: 'Start eating dates daily', priority: 'Medium', timing: 'Daily', status: 'pending', points: 10, isDaily: true },
+  { id: 't61', category: 'Body Prep', task: 'Start raspberry leaf tea daily', priority: 'Medium', timing: 'Daily', status: 'pending', points: 10, isDaily: true },
   { id: 't62', category: 'Body Prep', task: 'Blow up yoga ball', priority: 'Low', timing: 'This week', status: 'pending', points: 5 },
-  { id: 't63', category: 'Body Prep', task: 'Start yoga ball exercises daily', priority: 'Medium', timing: 'Daily gentle', status: 'pending', points: 10 },
+  { id: 't63', category: 'Body Prep', task: 'Start yoga ball exercises daily', priority: 'Medium', timing: 'Daily gentle', status: 'pending', points: 10, isDaily: true },
 
   // Final Prep
   { id: 't64', category: 'Final Prep', task: 'Final grocery and household stock', priority: 'Medium', timing: 'Week 36', status: 'pending', points: 25 },

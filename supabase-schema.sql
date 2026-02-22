@@ -12,12 +12,16 @@ CREATE TABLE IF NOT EXISTS tasks (
   claimed_by TEXT,
   completed_at TEXT,
   assigned_by TEXT,
+  is_daily BOOLEAN DEFAULT FALSE,
+  assigned_to_both BOOLEAN DEFAULT FALSE,
   created_at TIMESTAMP DEFAULT NOW(),
   updated_at TIMESTAMP DEFAULT NOW()
 );
 
 -- Migration: run this if the table already exists
 -- ALTER TABLE tasks ADD COLUMN IF NOT EXISTS assigned_by TEXT;
+-- ALTER TABLE tasks ADD COLUMN IF NOT EXISTS is_daily BOOLEAN DEFAULT FALSE;
+-- ALTER TABLE tasks ADD COLUMN IF NOT EXISTS assigned_to_both BOOLEAN DEFAULT FALSE;
 
 -- Create shopping_items table
 CREATE TABLE IF NOT EXISTS shopping_items (

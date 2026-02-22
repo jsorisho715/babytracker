@@ -4,7 +4,7 @@ import { useStore } from '../store/useStore';
 import { CATEGORY_EMOJIS } from '../data/seedData';
 import type { Player, PointTier } from '../types';
 import PointsBadge from '../components/PointsBadge';
-import { Trophy, Flame, Star, ChevronRight } from 'lucide-react';
+import { Trophy, Flame, Star, ChevronRight, ClipboardList, RefreshCw } from 'lucide-react';
 
 function PlayerCard({ player }: { player: Player }) {
   const { scores, tasks, shopping } = useStore();
@@ -157,6 +157,172 @@ function SuggestedTasks() {
   );
 }
 
+function AssignedCard() {
+  const { tasks, activePlayer, scores, setActiveTab } = useStore();
+  const otherPlayer: Player = activePlayer === 'johnathan' ? 'jordyn' : 'johnathan';
+  const myName = scores[activePlayer].displayName;
+
+  const toMe = tasks.filter(t => t.claimedBy === activePlayer && t.status !== 'done');
+  const byMe = tasks.filter(t => t.assignedBy === activePlayer && t.status !== 'done');
+  const hasAny = toMe.length > 0 || byMe.length > 0;
+
+  if (!hasAny) {
+    return (
+      <div className="card flex items-center justify-between gap-3 py-3">
+        <div className="flex items-center gap-2">
+          <ClipboardList className="w-4 h-4 text-warm-gray" />
+          <p className="text-sm font-display font-600 text-warm-gray">No assigned tasks for {myName}</p>
+        </div>
+        <button
+          onClick={() => setActiveTab('tasks')}
+          className="text-xs text-sage-500 font-display font-700 whitespace-nowrap"
+        >
+          Assign one →
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="card">
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <ClipboardList className="w-4 h-4 text-sage-500" />
+          <h3 className="font-display font-700 text-gray-800">Assigned — {myName}</h3>
+        </div>
+        <button
+          onClick={() => setActiveTab('assigned')}
+          className="text-xs text-sage-500 font-display font-700"
+        >
+          See all
+        </button>
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        <button
+          onClick={() => setActiveTab('assigned')}
+          className="bg-rose-50 rounded-2xl p-3 text-left"
+        >
+          <p className="text-2xl font-display font-800 text-rose-medium">{toMe.length}</p>
+          <p className="text-xs text-warm-gray font-display font-600">claimed by me</p>
+        </button>
+        <button
+          onClick={() => setActiveTab('assigned')}
+          className="bg-sage-50 rounded-2xl p-3 text-left"
+        >
+          <p className="text-2xl font-display font-800 text-sage-500">{byMe.length}</p>
+          <p className="text-xs text-warm-gray font-display font-600">assigned out by me</p>
+        </button>
+      </div>
+      {toMe.length > 0 && (
+        <div className="mt-3 space-y-1.5">
+          {toMe.slice(0, 2).map(t => (
+            <div key={t.id} className="flex items-center gap-2 px-3 py-2 bg-cream-100 rounded-xl">
+              <span className="text-xs font-display font-600 text-gray-800 flex-1 truncate">{t.task}</span>
+              {t.assignedBy && (
+                <span className="text-[10px] text-rose-medium font-display font-700">
+                  from {scores[otherPlayer].displayName}
+                </span>
+              )}
+            </div>
+          ))}
+          {toMe.length > 2 && (
+            <button onClick={() => setActiveTab('assigned')} className="text-xs text-sage-500 font-display font-700 px-3">
+              +{toMe.length - 2} more →
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function DailySection() {
+  const { tasks, activePlayer, scores, claimTask, completeTask, setActiveTab } = useStore();
+  const today = new Date().toISOString().slice(0, 10);
+  const myName = scores[activePlayer].displayName;
+
+  const dailyTasks = tasks.filter(t =>
+    t.isDaily &&
+    (t.claimedBy === activePlayer || t.status === 'pending') &&
+    (t.status !== 'done' || !t.completedAt || t.completedAt.slice(0, 10) < today)
+  );
+
+  if (dailyTasks.length === 0) {
+    return (
+      <div className="card flex items-center justify-between gap-3 py-3">
+        <div className="flex items-center gap-2">
+          <RefreshCw className="w-4 h-4 text-warm-gray" />
+          <p className="text-sm font-display font-600 text-warm-gray">No daily tasks yet</p>
+        </div>
+        <button
+          onClick={() => setActiveTab('tasks')}
+          className="text-xs text-sage-500 font-display font-700 whitespace-nowrap"
+        >
+          Add one →
+        </button>
+      </div>
+    );
+  }
+
+  const doneToday = dailyTasks.filter(t => t.status === 'done' && t.completedAt?.slice(0, 10) === today).length;
+
+  return (
+    <div className="card">
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <RefreshCw className="w-4 h-4 text-sage-500" />
+          <h3 className="font-display font-700 text-gray-800">Daily — {myName}</h3>
+          {doneToday > 0 && (
+            <span className="text-xs bg-sage-100 text-sage-600 font-display font-700 px-2 py-0.5 rounded-full">
+              {doneToday}/{dailyTasks.length} done
+            </span>
+          )}
+        </div>
+        <button
+          onClick={() => setActiveTab('tasks')}
+          className="text-xs text-sage-500 font-display font-700"
+        >
+          See all
+        </button>
+      </div>
+      <div className="space-y-2">
+        {dailyTasks.map(task => {
+          const isDone = task.status === 'done';
+          const isClaimed = task.status === 'claimed' && task.claimedBy === activePlayer;
+          return (
+            <div key={task.id} className={`flex items-center gap-3 p-2.5 rounded-2xl ${isDone ? 'bg-sage-50 opacity-70' : 'bg-cream-100'}`}>
+              <div className="flex-1 min-w-0">
+                <p className={`text-sm font-display font-600 text-gray-800 truncate ${isDone ? 'line-through' : ''}`}>{task.task}</p>
+                <p className="text-xs text-warm-gray">{task.category}</p>
+              </div>
+              <PointsBadge points={task.points as PointTier} />
+              <button
+                onClick={() => {
+                  if (isDone) return;
+                  if (task.status === 'pending') claimTask(task.id);
+                  else if (isClaimed) completeTask(task.id);
+                }}
+                disabled={isDone || (task.status === 'claimed' && task.claimedBy !== activePlayer)}
+                className={`text-xs font-display font-700 px-3 py-1.5 rounded-xl transition-all whitespace-nowrap ${
+                  isDone
+                    ? 'bg-sage-200 text-sage-500 cursor-default'
+                    : isClaimed
+                    ? 'bg-sage-400 text-white hover:bg-sage-500'
+                    : task.status === 'pending'
+                    ? 'bg-sage-100 text-sage-600 hover:bg-sage-200'
+                    : 'bg-cream-200 text-warm-gray cursor-not-allowed'
+                }`}
+              >
+                {isDone ? '✓ Done' : isClaimed ? 'Complete' : 'Claim'}
+              </button>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 export default function Dashboard() {
   const { tasks, shopping, scores, settings, isLoaded, loadSeedData } = useStore();
   const celebratedRef = useRef(false);
@@ -229,6 +395,12 @@ export default function Dashboard() {
               </p>
             )}
           </div>
+
+          {/* Assigned Card */}
+          <AssignedCard />
+
+          {/* Daily Section */}
+          <DailySection />
 
           {/* Player Cards */}
           <div className="flex gap-3">

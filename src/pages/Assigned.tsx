@@ -29,6 +29,7 @@ function TaskForm({ initial, onSave, onCancel }: TaskFormProps) {
   const [timing, setTiming] = useState(initial?.timing ?? 'ASAP');
   const [notes, setNotes] = useState(initial?.notes ?? '');
   const [points, setPoints] = useState<PointTier>(initial?.points ?? 25);
+  const [isDaily, setIsDaily] = useState(initial?.isDaily ?? false);
 
   const handleSave = () => {
     if (!taskName.trim()) return;
@@ -39,6 +40,7 @@ function TaskForm({ initial, onSave, onCancel }: TaskFormProps) {
       timing,
       notes: notes.trim() || undefined,
       points,
+      isDaily,
       status: initial?.status ?? 'pending',
       completedBy: initial?.completedBy,
       claimedBy: initial?.claimedBy,
@@ -106,6 +108,18 @@ function TaskForm({ initial, onSave, onCancel }: TaskFormProps) {
         placeholder="Notes (optional)"
         className="w-full px-4 py-2.5 bg-cream-100 rounded-xl text-sm font-display font-500 border-none outline-none focus:ring-2 focus:ring-sage-300"
       />
+      <button
+        type="button"
+        onClick={() => setIsDaily(v => !v)}
+        className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-display font-600 w-full transition-colors ${
+          isDaily ? 'bg-sage-100 text-sage-600' : 'bg-cream-100 text-warm-gray hover:bg-cream-200'
+        }`}
+      >
+        <span className={`w-4 h-4 rounded border-2 flex items-center justify-center flex-shrink-0 ${isDaily ? 'bg-sage-400 border-sage-400' : 'border-warm-gray'}`}>
+          {isDaily && <span className="text-white text-[10px] font-900">✓</span>}
+        </span>
+        🔄 Repeat daily
+      </button>
       <div className="flex gap-2">
         <button onClick={handleSave} className="btn-primary flex-1 py-2 text-sm">Save</button>
         <button onClick={onCancel} className="btn-secondary flex-1 py-2 text-sm">Cancel</button>
@@ -125,10 +139,12 @@ function AssignedTaskCard({ task, onEdit }: { task: Task; onEdit: () => void }) 
 
   const isDone = task.status === 'done';
   const isClaimed = task.status === 'claimed';
+  const isTeam = !!task.assignedToBoth;
   const isMyTask = task.claimedBy === activePlayer;
 
   const handlePrimary = () => {
     if (isDone) uncompleteTask(task.id);
+    else if (isTeam) completeTask(task.id);
     else if (isClaimed && isMyTask) completeTask(task.id);
   };
 
@@ -137,10 +153,12 @@ function AssignedTaskCard({ task, onEdit }: { task: Task; onEdit: () => void }) 
       <div className="flex items-start gap-3">
         <button
           onClick={handlePrimary}
-          disabled={isDone ? false : !isMyTask}
+          disabled={isDone ? false : (!isMyTask && !isTeam)}
           className={`mt-0.5 w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 transition-all ${
             isDone
               ? 'bg-sage-400 text-white'
+              : isTeam
+              ? 'bg-yellow-100 text-yellow-600 hover:bg-yellow-400 hover:text-white'
               : isMyTask
               ? 'bg-sage-100 text-sage-500 hover:bg-sage-400 hover:text-white'
               : 'bg-cream-200 text-warm-gray cursor-not-allowed'
@@ -159,7 +177,12 @@ function AssignedTaskCard({ task, onEdit }: { task: Task; onEdit: () => void }) 
             <span className="text-xs text-warm-gray">· {task.timing}</span>
             <PointsBadge points={task.points as PointTier} />
           </div>
-          {task.assignedBy && task.claimedBy && (
+          {isTeam && !isDone && (
+            <p className="text-xs font-display font-600 mt-0.5 text-yellow-600">
+              🤝 Team Luca — complete together!
+            </p>
+          )}
+          {!isTeam && task.assignedBy && task.claimedBy && (
             <p className={`text-xs font-display font-600 mt-0.5 ${task.claimedBy === 'johnathan' ? 'text-sage-500' : 'text-rose-medium'}`}>
               📌 {scores[task.claimedBy].displayName} ← assigned by {scores[task.assignedBy].displayName}
             </p>
@@ -269,9 +292,9 @@ export default function Assigned() {
   const myName = scores[activePlayer].displayName;
   const otherName = scores[otherPlayer].displayName;
 
-  // Tasks claimed by me (partner-assigned OR self-assigned), not done
+  // Tasks claimed by me, OR team tasks (both), not done
   const toMe = tasks.filter(
-    t => t.claimedBy === activePlayer && t.status !== 'done'
+    t => t.status !== 'done' && (t.claimedBy === activePlayer || t.assignedToBoth)
   );
 
   // Tasks I assigned to my partner, not done
@@ -279,13 +302,16 @@ export default function Assigned() {
     t => t.assignedBy === activePlayer && t.status !== 'done'
   );
 
+  // Team tasks (shown in "all" and "to-me")
+  const teamTasks = tasks.filter(t => t.assignedToBoth && t.status !== 'done');
+
   const displayed =
     filter === 'to-me' ? toMe :
     filter === 'by-me' ? byMe :
     // "all" — union, deduped by id
-    [...toMe, ...byMe.filter(t => t.claimedBy !== activePlayer)];
+    [...new Map([...toMe, ...byMe.filter(t => !t.assignedToBoth && t.claimedBy !== activePlayer), ...teamTasks].map(t => [t.id, t])).values()];
 
-  const hasAny = toMe.length > 0 || byMe.length > 0;
+  const hasAny = toMe.length > 0 || byMe.length > 0 || teamTasks.length > 0;
 
   const renderCard = (task: Task) => (
     editId === task.id ? (
@@ -321,7 +347,7 @@ export default function Assigned() {
       {/* Filter tabs */}
       <div className="flex gap-1.5">
         {([
-          { key: 'all', label: `All (${toMe.length + byMe.filter(t => t.claimedBy !== activePlayer).length})` },
+          { key: 'all', label: `All (${displayed.length})` },
           { key: 'to-me', label: `To ${myName} (${toMe.length})` },
           { key: 'by-me', label: `By ${myName} (${byMe.length})` },
         ] as { key: AssignedFilter; label: string }[]).map(({ key, label }) => (
@@ -362,7 +388,10 @@ export default function Assigned() {
         <div className="space-y-2">
           {displayed.map(task => {
             const isToMe = task.claimedBy === activePlayer;
-            const fromLabel = isToMe && task.assignedBy
+            const isTeam = !!task.assignedToBoth;
+            const fromLabel = isTeam
+              ? `🤝 Team Luca`
+              : isToMe && task.assignedBy
               ? `📌 Assigned to ${myName} by ${otherName}`
               : isToMe
               ? `🤚 Claimed by ${myName}`
@@ -370,7 +399,7 @@ export default function Assigned() {
             return (
               <div key={task.id}>
                 {filter === 'all' && (
-                  <p className={`text-[10px] font-display font-700 mb-1 px-1 ${isToMe ? 'text-rose-medium' : 'text-sage-500'}`}>
+                  <p className={`text-[10px] font-display font-700 mb-1 px-1 ${isTeam ? 'text-yellow-600' : isToMe ? 'text-rose-medium' : 'text-sage-500'}`}>
                     {fromLabel}
                   </p>
                 )}
