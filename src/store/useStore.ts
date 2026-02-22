@@ -102,6 +102,7 @@ interface AppState {
   // Actions - tasks
   loadSeedData: (force?: boolean) => Promise<void>;
   syncToSupabase: () => Promise<void>;
+  resetToSeed: () => Promise<void>;
   addTask: (task: Omit<Task, 'id'>) => void;
   updateTask: (id: string, updates: Partial<Task>) => void;
   deleteTask: (id: string) => void;
@@ -316,6 +317,42 @@ export const useStore = create<AppState>()(
         } catch (err) {
           console.error('Failed to sync to Supabase:', err);
         }
+      },
+
+      resetToSeed: async () => {
+        // Reset local state immediately
+        set({
+          tasks: seedTasks,
+          shopping: seedShoppingItems,
+          goals: seedGoals,
+          dailyCompletions: [],
+          scores: DEFAULT_SCORES,
+          previousMilestone: 0,
+          isLoaded: true,
+        });
+
+        if (SUPABASE_ENABLED) {
+          try {
+            // Clear all user data from Supabase
+            await Promise.all([
+              supabase.from('daily_completions').delete().neq('task_id', '__never__' as any),
+              supabase.from('tasks').delete().neq('id', '__never__' as any),
+              supabase.from('shopping_items').delete().neq('id', '__never__' as any),
+              supabase.from('goals').delete().neq('id', '__never__' as any),
+            ]);
+            // Reset player scores
+            await supabase.from('player_scores').upsert([
+              { player: 'johnathan', display_name: 'Johnathan', total_points: 0, tasks_completed: 0, streak_days: 0, last_completed_date: null },
+              { player: 'jordyn', display_name: 'Jordyn', total_points: 0, tasks_completed: 0, streak_days: 0, last_completed_date: null },
+            ] as any);
+            // Re-insert seed data
+            await get().syncToSupabase();
+          } catch (err) {
+            console.error('Supabase reset error:', err);
+          }
+        }
+
+        get().addToast({ message: 'All data reset to fresh start', type: 'info' });
       },
 
       addTask: (taskData) => {

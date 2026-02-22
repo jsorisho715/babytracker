@@ -196,11 +196,15 @@ export default function Shopping() {
   const [showAdd, setShowAdd] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
 
-  const filtered = shopping.filter(i => {
-    if (filter === 'need') return i.status === 'Need to Purchase';
-    if (filter === 'purchased') return i.status === 'Purchased';
-    return true;
-  });
+  const byPointsDesc = (a: { points: number }, b: { points: number }) => (b.points ?? 0) - (a.points ?? 0);
+
+  const needItems = [...shopping.filter(i => i.status === 'Need to Purchase')].sort(byPointsDesc);
+  const purchasedItems = [...shopping.filter(i => i.status === 'Purchased')].sort(byPointsDesc);
+
+  const filtered =
+    filter === 'need' ? needItems :
+    filter === 'purchased' ? purchasedItems :
+    [...needItems, ...purchasedItems];
 
   const needCount = shopping.filter(s => s.status === 'Need to Purchase').length;
   const purchasedCount = shopping.filter(s => s.status === 'Purchased').length;
@@ -224,12 +228,12 @@ export default function Shopping() {
 
       {/* Filter + Add */}
       <div className="flex items-center justify-between gap-2">
-        <div className="flex gap-1.5">
+        <div className="flex gap-1.5 overflow-x-auto pb-0.5 -mx-1 px-1">
           {(['all', 'need', 'purchased'] as Filter[]).map(f => (
             <button
               key={f}
               onClick={() => setFilter(f)}
-              className={`category-chip ${filter === f ? 'category-chip-active' : ''}`}
+              className={`category-chip flex-shrink-0 whitespace-nowrap ${filter === f ? 'category-chip-active' : ''}`}
             >
               {f === 'all' ? `All (${shopping.length})` : f === 'need' ? `Need (${needCount})` : `Got (${purchasedCount})`}
             </button>

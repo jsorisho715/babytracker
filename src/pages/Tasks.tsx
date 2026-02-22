@@ -349,12 +349,15 @@ interface CategoryGroupProps {
   onCancelEdit: () => void;
 }
 
+const byPointsDesc = (a: { points: number }, b: { points: number }) => (b.points ?? 0) - (a.points ?? 0);
+
 function CategoryGroup({ category, tasks, defaultOpen, onEdit, editId, onCancelEdit }: CategoryGroupProps) {
   const [open, setOpen] = useState(defaultOpen);
   const { updateTask } = useStore();
   const emoji = CATEGORY_EMOJIS[category] ?? '📋';
   const done = tasks.filter(t => t.status === 'done').length;
   const allDone = done === tasks.length;
+  const sorted = [...tasks].sort(byPointsDesc);
 
   return (
     <div className="card">
@@ -374,7 +377,7 @@ function CategoryGroup({ category, tasks, defaultOpen, onEdit, editId, onCancelE
 
       {open && (
         <div className="mt-3 space-y-2">
-          {tasks.map(task => (
+          {sorted.map(task => (
             editId === task.id ? (
               <TaskForm
                 key={task.id}
@@ -440,7 +443,7 @@ export default function Tasks() {
 
       {/* Status filter + Add */}
       <div className="flex items-center justify-between gap-2">
-        <div className="flex gap-1.5 overflow-x-auto pb-0.5">
+        <div className="flex gap-1.5 overflow-x-auto pb-0.5 -mx-1 px-1">
           {(['all', 'pending', 'claimed', 'done'] as Filter[]).map(f => (
             <button
               key={f}
@@ -460,7 +463,7 @@ export default function Tasks() {
       </div>
 
       {/* Category + Daily filter */}
-      <div className="flex gap-1.5 overflow-x-auto pb-0.5">
+      <div className="flex gap-1.5 overflow-x-auto pb-0.5 -mx-4 px-4">
         <button
           onClick={() => setCategoryFilter('all')}
           className={`category-chip whitespace-nowrap flex-shrink-0 ${categoryFilter === 'all' && !dailyOnly ? 'category-chip-active' : ''}`}

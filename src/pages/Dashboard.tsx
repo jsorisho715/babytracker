@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react';
 import confetti from 'canvas-confetti';
 import { useStore } from '../store/useStore';
 import { CATEGORY_EMOJIS } from '../data/seedData';
-import type { Player, PointTier } from '../types';
+import type { Player, PointTier, Task } from '../types';
 import PointsBadge from '../components/PointsBadge';
 import { Trophy, Flame, Star, ChevronRight, ClipboardList, RefreshCw } from 'lucide-react';
 
@@ -113,8 +113,9 @@ function AssignedCard() {
   const otherPlayer: Player = activePlayer === 'johnathan' ? 'jordyn' : 'johnathan';
   const myName = scores[activePlayer].displayName;
 
-  const toMe = tasks.filter(t => t.claimedBy === activePlayer && t.status !== 'done');
-  const byMe = tasks.filter(t => t.assignedBy === activePlayer && t.status !== 'done');
+  const byPointsDesc = (a: Task, b: Task) => (b.points ?? 0) - (a.points ?? 0);
+  const toMe = tasks.filter(t => t.claimedBy === activePlayer && t.status !== 'done').sort(byPointsDesc);
+  const byMe = tasks.filter(t => t.assignedBy === activePlayer && t.status !== 'done').sort(byPointsDesc);
   const hasAny = toMe.length > 0 || byMe.length > 0;
 
   if (!hasAny) {
@@ -154,14 +155,14 @@ function AssignedCard() {
           className="bg-rose-50 rounded-2xl p-3 text-left"
         >
           <p className="text-2xl font-display font-800 text-rose-medium">{toMe.length}</p>
-          <p className="text-xs text-warm-gray font-display font-600">claimed by me</p>
+          <p className="text-xs text-warm-gray font-display font-600">assigned to me</p>
         </button>
         <button
           onClick={() => setActiveTab('assigned')}
           className="bg-sage-50 rounded-2xl p-3 text-left"
         >
           <p className="text-2xl font-display font-800 text-sage-500">{byMe.length}</p>
-          <p className="text-xs text-warm-gray font-display font-600">assigned out by me</p>
+          <p className="text-xs text-warm-gray font-display font-600">my tasks</p>
         </button>
       </div>
       {toMe.length > 0 && (
@@ -197,10 +198,9 @@ function DailySection() {
 
   // Show daily tasks that are unassigned, assigned to me, or team tasks.
   // Use !t.claimedBy as a fallback for team tasks where assignedToBoth may have lost sync.
-  const dailyTasks = tasks.filter(t =>
-    t.isDaily &&
-    (t.assignedToBoth || !t.claimedBy || t.claimedBy === activePlayer)
-  );
+  const dailyTasks = tasks
+    .filter(t => t.isDaily && (t.assignedToBoth || !t.claimedBy || t.claimedBy === activePlayer))
+    .sort((a, b) => (b.points ?? 0) - (a.points ?? 0));
 
   if (dailyTasks.length === 0) {
     return (

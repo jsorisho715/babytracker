@@ -3,8 +3,8 @@ import type { Task, ShoppingItem, Goal } from '../types';
 export const seedTasks: Task[] = [
   // Nursery
   { id: 't1', category: 'Nursery', task: 'Remove bed and desks from nursery', priority: 'High', timing: 'ASAP', status: 'pending', points: 50 },
-  { id: 't2', category: 'Nursery', task: 'Order dresser', priority: 'High', timing: 'ASAP', status: 'done', points: 25 },
-  { id: 't3', category: 'Nursery', task: 'Order rocker/recliner', priority: 'High', timing: 'ASAP', status: 'done', points: 25 },
+  { id: 't2', category: 'Nursery', task: 'Order dresser', priority: 'High', timing: 'ASAP', status: 'pending', points: 25 },
+  { id: 't3', category: 'Nursery', task: 'Order rocker/recliner', priority: 'High', timing: 'ASAP', status: 'pending', points: 25 },
   { id: 't4', category: 'Nursery', task: 'Rearrange master bedroom for bassinet + bedside cart', priority: 'High', timing: 'ASAP', status: 'pending', points: 100 },
   { id: 't5', category: 'Nursery', task: 'Set up bassinet', priority: 'High', timing: 'ASAP', status: 'pending', points: 25 },
   { id: 't6', category: 'Nursery', task: 'Set up downstairs safe sleep space (pack n play - bassinet ready)', priority: 'High', timing: 'ASAP', status: 'pending', points: 50 },
@@ -17,7 +17,7 @@ export const seedTasks: Task[] = [
 
   // Baby Clothing
   { id: 't13', category: 'Baby Clothing', task: 'Wash baby clothes', priority: 'High', timing: 'ASAP', status: 'pending', points: 25 },
-  { id: 't14', category: 'Baby Clothing', task: 'Sort baby clothes by size', priority: 'High', timing: 'ASAP', status: 'done', points: 25 },
+  { id: 't14', category: 'Baby Clothing', task: 'Sort baby clothes by size', priority: 'High', timing: 'ASAP', status: 'pending', points: 25 },
   { id: 't15', category: 'Baby Clothing', task: 'Put baby clothes away', priority: 'High', timing: 'ASAP', status: 'pending', points: 25 },
   { id: 't16', category: 'Baby Clothing', task: 'Set up baby clothes storage system', priority: 'Medium', timing: 'ASAP', status: 'pending', points: 25 },
 

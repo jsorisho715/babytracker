@@ -13,11 +13,10 @@ const NAV_ITEMS: { tab: NavTab; icon: React.ReactNode; label: string }[] = [
 export default function BottomNav() {
   const { activeTab, setActiveTab, tasks, shopping, activePlayer } = useStore();
 
-  const otherPlayer = activePlayer === 'johnathan' ? 'jordyn' : 'johnathan';
   const pendingTasks = tasks.filter(t => t.status !== 'done').length;
   const pendingShopping = shopping.filter(s => s.status === 'Need to Purchase').length;
   const assignedToMe = tasks.filter(
-    t => t.claimedBy === activePlayer && t.assignedBy === otherPlayer && t.status !== 'done'
+    t => t.status !== 'done' && (t.claimedBy === activePlayer || t.assignedToBoth)
   ).length;
 
   return (

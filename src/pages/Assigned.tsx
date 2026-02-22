@@ -281,7 +281,9 @@ function AssignedTaskCard({ task, onEdit }: { task: Task; onEdit: () => void }) 
   );
 }
 
-type AssignedFilter = 'all' | 'to-me' | 'by-me';
+type AssignedFilter = 'all' | 'to-me' | 'my-tasks';
+
+const byPointsDesc = (a: Task, b: Task) => (b.points ?? 0) - (a.points ?? 0);
 
 export default function Assigned() {
   const { tasks, activePlayer, scores, updateTask } = useStore();
@@ -292,26 +294,34 @@ export default function Assigned() {
   const myName = scores[activePlayer].displayName;
   const otherName = scores[otherPlayer].displayName;
 
-  // Tasks claimed by me, OR team tasks (both), not done
+  // Tasks assigned to me (claimed by me or team tasks), not done
   const toMe = tasks.filter(
     t => t.status !== 'done' && (t.claimedBy === activePlayer || t.assignedToBoth)
   );
 
-  // Tasks I assigned to my partner, not done
-  const byMe = tasks.filter(
+  // My tasks = tasks I assigned to my partner (not done)
+  const myTasks = tasks.filter(
     t => t.assignedBy === activePlayer && t.status !== 'done'
   );
 
-  // Team tasks (shown in "all" and "to-me")
+  // Team tasks
   const teamTasks = tasks.filter(t => t.assignedToBoth && t.status !== 'done');
 
   const displayed =
     filter === 'to-me' ? toMe :
-    filter === 'by-me' ? byMe :
-    // "all" — union, deduped by id
-    [...new Map([...toMe, ...byMe.filter(t => !t.assignedToBoth && t.claimedBy !== activePlayer), ...teamTasks].map(t => [t.id, t])).values()];
+    filter === 'my-tasks' ? myTasks :
+    [...new Map([...toMe, ...myTasks.filter(t => !t.assignedToBoth && t.claimedBy !== activePlayer), ...teamTasks].map(t => [t.id, t])).values()];
 
-  const hasAny = toMe.length > 0 || byMe.length > 0 || teamTasks.length > 0;
+  const hasAny = toMe.length > 0 || myTasks.length > 0 || teamTasks.length > 0;
+
+  // Group displayed tasks by category in TASK_CATEGORIES order
+  const allCategories = [...TASK_CATEGORIES, 'Other'];
+  const grouped = allCategories
+    .map(cat => ({
+      category: cat,
+      tasks: displayed.filter(t => (t.category || 'Other') === cat).sort(byPointsDesc),
+    }))
+    .filter(g => g.tasks.length > 0);
 
   const renderCard = (task: Task) => (
     editId === task.id ? (
@@ -336,33 +346,35 @@ export default function Assigned() {
       <div className="grid grid-cols-2 gap-3">
         <div className="card text-center">
           <p className="text-2xl font-display font-800 text-rose-medium">{toMe.length}</p>
-          <p className="text-xs text-warm-gray font-display font-600">Claimed by {myName}</p>
+          <p className="text-xs text-warm-gray font-display font-600">Assigned to me</p>
         </div>
         <div className="card text-center">
-          <p className="text-2xl font-display font-800 text-sage-500">{byMe.length}</p>
-          <p className="text-xs text-warm-gray font-display font-600">{myName} assigned out</p>
+          <p className="text-2xl font-display font-800 text-sage-500">{myTasks.length}</p>
+          <p className="text-xs text-warm-gray font-display font-600">My tasks</p>
         </div>
       </div>
 
-      {/* Filter tabs */}
-      <div className="flex gap-1.5">
-        {([
-          { key: 'all', label: `All (${displayed.length})` },
-          { key: 'to-me', label: `To ${myName} (${toMe.length})` },
-          { key: 'by-me', label: `By ${myName} (${byMe.length})` },
-        ] as { key: AssignedFilter; label: string }[]).map(({ key, label }) => (
-          <button
-            key={key}
-            onClick={() => setFilter(key)}
-            className={`px-3 py-1.5 rounded-xl text-xs font-display font-700 transition-colors whitespace-nowrap ${
-              filter === key
-                ? 'bg-sage-400 text-white'
-                : 'bg-cream-200 text-warm-gray hover:bg-cream-300'
-            }`}
-          >
-            {label}
-          </button>
-        ))}
+      {/* Filter tabs — horizontally scrollable on mobile */}
+      <div className="overflow-x-auto -mx-4 px-4">
+        <div className="flex gap-1.5 min-w-max">
+          {([
+            { key: 'all', label: `All (${displayed.length})` },
+            { key: 'to-me', label: `To ${myName} (${toMe.length})` },
+            { key: 'my-tasks', label: `My tasks (${myTasks.length})` },
+          ] as { key: AssignedFilter; label: string }[]).map(({ key, label }) => (
+            <button
+              key={key}
+              onClick={() => setFilter(key)}
+              className={`flex-shrink-0 px-3 py-1.5 rounded-xl text-xs font-display font-700 transition-colors whitespace-nowrap ${
+                filter === key
+                  ? 'bg-sage-400 text-white'
+                  : 'bg-cream-200 text-warm-gray hover:bg-cream-300'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Empty state */}
@@ -383,32 +395,19 @@ export default function Assigned() {
         </div>
       )}
 
-      {/* Task list */}
-      {displayed.length > 0 && (
-        <div className="space-y-2">
-          {displayed.map(task => {
-            const isToMe = task.claimedBy === activePlayer;
-            const isTeam = !!task.assignedToBoth;
-            const fromLabel = isTeam
-              ? `🤝 Team Luca`
-              : isToMe && task.assignedBy
-              ? `📌 Assigned to ${myName} by ${otherName}`
-              : isToMe
-              ? `🤚 Claimed by ${myName}`
-              : `📋 Assigned by ${myName} → ${otherName}`;
-            return (
-              <div key={task.id}>
-                {filter === 'all' && (
-                  <p className={`text-[10px] font-display font-700 mb-1 px-1 ${isTeam ? 'text-yellow-600' : isToMe ? 'text-rose-medium' : 'text-sage-500'}`}>
-                    {fromLabel}
-                  </p>
-                )}
-                {renderCard(task)}
-              </div>
-            );
-          })}
+      {/* Category groups */}
+      {grouped.map(({ category, tasks: catTasks }) => (
+        <div key={category} className="card space-y-2">
+          <div className="flex items-center gap-2 mb-1">
+            <span className="text-lg">{CATEGORY_EMOJIS[category] ?? '📋'}</span>
+            <h3 className="font-display font-700 text-gray-800 text-sm">{category}</h3>
+            <span className="text-xs font-display font-600 px-2 py-0.5 rounded-full bg-cream-200 text-warm-gray">
+              {catTasks.length}
+            </span>
+          </div>
+          {catTasks.map(task => renderCard(task))}
         </div>
-      )}
+      ))}
     </div>
   );
 }

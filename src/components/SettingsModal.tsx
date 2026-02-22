@@ -7,23 +7,27 @@ interface Props {
 }
 
 export default function SettingsModal({ onClose }: Props) {
-  const { settings, updateSettings, loadSeedData } = useStore();
+  const { settings, updateSettings, loadSeedData, resetToSeed } = useStore();
   const [babyName, setBabyName] = useState(settings.babyName);
   const [dueDate, setDueDate] = useState(settings.dueDate ?? '');
   const [confirmReset, setConfirmReset] = useState(false);
+  const [resetting, setResetting] = useState(false);
 
   const handleSave = () => {
     updateSettings({ babyName: babyName.trim() || 'Luca', dueDate: dueDate || undefined });
     onClose();
   };
 
-  const handleReset = () => {
+  const handleReset = async () => {
+    setResetting(true);
     localStorage.removeItem('baby-tracker-store');
-    window.location.reload();
+    await resetToSeed();
+    setResetting(false);
+    onClose();
   };
 
   const handleReimport = () => {
-    loadSeedData();
+    loadSeedData(true);
     onClose();
   };
 
@@ -90,8 +94,8 @@ export default function SettingsModal({ onClose }: Props) {
                 </p>
               </div>
               <div className="flex gap-2">
-                <button onClick={handleReset} className="flex-1 bg-red-500 text-white font-display font-700 rounded-xl py-2 text-sm">
-                  Yes, Reset
+                <button onClick={handleReset} disabled={resetting} className="flex-1 bg-red-500 text-white font-display font-700 rounded-xl py-2 text-sm disabled:opacity-60">
+                  {resetting ? 'Resetting…' : 'Yes, Reset'}
                 </button>
                 <button onClick={() => setConfirmReset(false)} className="flex-1 bg-cream-100 text-warm-gray font-display font-700 rounded-xl py-2 text-sm">
                   Cancel
