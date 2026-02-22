@@ -188,14 +188,16 @@ function AssignedCard() {
 }
 
 function DailySection() {
-  const { tasks, activePlayer, scores, claimTask, completeTask, setActiveTab } = useStore();
+  const { tasks, dailyCompletions, activePlayer, scores, claimTask, completeTask, setActiveTab } = useStore();
   const today = new Date().toISOString().slice(0, 10);
   const myName = scores[activePlayer].displayName;
 
+  const isDoneToday = (taskId: string) =>
+    dailyCompletions.some(c => c.taskId === taskId && c.date === today);
+
   const dailyTasks = tasks.filter(t =>
     t.isDaily &&
-    (t.claimedBy === activePlayer || t.status === 'pending' || t.assignedToBoth) &&
-    (t.status !== 'done' || !t.completedAt || t.completedAt.slice(0, 10) < today)
+    (t.claimedBy === activePlayer || t.status === 'pending' || t.assignedToBoth)
   );
 
   if (dailyTasks.length === 0) {
@@ -215,7 +217,7 @@ function DailySection() {
     );
   }
 
-  const doneToday = dailyTasks.filter(t => t.status === 'done' && t.completedAt?.slice(0, 10) === today).length;
+  const doneToday = dailyTasks.filter(t => isDoneToday(t.id)).length;
 
   return (
     <div className="card">
@@ -238,7 +240,7 @@ function DailySection() {
       </div>
       <div className="space-y-2">
         {dailyTasks.map(task => {
-          const isDone = task.status === 'done';
+          const isDone = isDoneToday(task.id);
           const isTeam = !!task.assignedToBoth;
           const isClaimedByMe = task.status === 'claimed' && task.claimedBy === activePlayer;
           const canComplete = isClaimedByMe || isTeam;

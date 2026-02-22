@@ -113,6 +113,7 @@ export default function App() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'shopping_items' }, () => loadSeedData(true))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'goals' }, () => loadSeedData(true))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'player_scores' }, () => loadSeedData(true))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'daily_completions' }, () => loadSeedData(true))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'app_settings' }, (payload: { new?: { baby_name?: string; due_date?: string | null; pregnancy_week?: number | null } }) => {
         const row = payload.new;
         if (row) {

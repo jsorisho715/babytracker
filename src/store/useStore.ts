@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type {
-  Task, ShoppingItem, Goal, Player, PlayerScore, AppSettings, Toast, NavTab, Badge
+  Task, ShoppingItem, Goal, Player, PlayerScore, AppSettings, Toast, NavTab, Badge, DailyCompletion
 } from '../types';
 import { seedTasks, seedShoppingItems, seedGoals, MILESTONE_MESSAGES } from '../data/seedData';
 import { supabase } from '../lib/supabase';
@@ -82,10 +82,15 @@ function updateStreak(score: PlayerScore): Partial<PlayerScore> {
   return { streakDays: 1, lastCompletedDate: today };
 }
 
+function getTodayDate() {
+  return new Date().toISOString().slice(0, 10);
+}
+
 interface AppState {
   tasks: Task[];
   shopping: ShoppingItem[];
   goals: Goal[];
+  dailyCompletions: DailyCompletion[];
   scores: Record<Player, PlayerScore>;
   settings: AppSettings;
   activePlayer: Player;
@@ -151,6 +156,7 @@ export const useStore = create<AppState>()(
       tasks: [],
       shopping: [],
       goals: [],
+      dailyCompletions: [],
       scores: DEFAULT_SCORES,
       settings: DEFAULT_SETTINGS,
       activePlayer: 'johnathan',
@@ -169,9 +175,10 @@ export const useStore = create<AppState>()(
             supabase.from('tasks').select('*'),
             supabase.from('shopping_items').select('*'),
             supabase.from('goals').select('*'),
+            supabase.from('daily_completions').select('*'),
             supabase.from('player_scores').select('*'),
             supabase.from('app_settings').select('*').eq('id', 'default').maybeSingle()
-          ]).then(([tasksRes, shoppingRes, goalsRes, scoresRes, settingsRes]) => {
+          ]).then(([tasksRes, shoppingRes, goalsRes, completionsRes, scoresRes, settingsRes]) => {
             const settingsRow = settingsRes.data;
             const settings = settingsRow ? {
               babyName: settingsRow.baby_name ?? 'Luca',
@@ -197,6 +204,12 @@ export const useStore = create<AppState>()(
                 status: s.status as any
               })) ?? [];
               const goals = goalsRes.data ?? [];
+              const dailyCompletions: DailyCompletion[] = (completionsRes.data ?? []).map((c: any) => ({
+                taskId: c.task_id,
+                player: c.player as Player,
+                date: c.date,
+                completedAt: c.completed_at,
+              }));
               const playerScores = scoresRes.data ?? [];
               
               const mapScore = (raw: any, defaultVal: PlayerScore): PlayerScore => ({
@@ -215,15 +228,15 @@ export const useStore = create<AppState>()(
                 jordyn: mapScore(playerScores.find(s => s.player === 'jordyn'), DEFAULT_SCORES.jordyn),
               };
 
-              set({ tasks, shopping, goals, scores, settings, isLoaded: true });
+              set({ tasks, shopping, goals, dailyCompletions, scores, settings, isLoaded: true });
             } else {
               // No data in Supabase, load seeds and sync
-              set({ tasks: seedTasks, shopping: seedShoppingItems, goals: seedGoals, settings, isLoaded: true });
+              set({ tasks: seedTasks, shopping: seedShoppingItems, goals: seedGoals, dailyCompletions: [], settings, isLoaded: true });
               get().syncToSupabase();
             }
           }).catch(() => {
             // Fallback to seeds if Supabase fails
-            set({ tasks: seedTasks, shopping: seedShoppingItems, goals: seedGoals, isLoaded: true });
+            set({ tasks: seedTasks, shopping: seedShoppingItems, goals: seedGoals, dailyCompletions: [], isLoaded: true });
           }) as Promise<void>;
         } else {
           // LocalStorage only
@@ -463,9 +476,83 @@ export const useStore = create<AppState>()(
       },
 
       completeTask: (id) => {
-        const { activePlayer, tasks, shopping, scores, previousMilestone } = get();
+        const { activePlayer, tasks, shopping, scores, previousMilestone, dailyCompletions } = get();
         const task = tasks.find(t => t.id === id);
-        if (!task || task.status === 'done') return;
+        if (!task) return;
+
+        const today = getTodayDate();
+
+        // Daily tasks: use per-day completions, never change task status
+        if (task.isDaily) {
+          const alreadyDoneToday = dailyCompletions.some(c => c.taskId === id && c.date === today);
+          if (alreadyDoneToday) return;
+
+          const now = new Date().toISOString();
+          const streakUpdates = updateStreak(scores[activePlayer]);
+          const newPoints = scores[activePlayer].totalPoints + task.points;
+          const streakBonus = (streakUpdates.streakDays && streakUpdates.streakDays >= 3) ? 5 : 0;
+
+          const newCompletion: DailyCompletion = { taskId: id, player: activePlayer, date: today, completedAt: now };
+          const newDailyCompletions = [...dailyCompletions, newCompletion];
+
+          const newScore: PlayerScore = {
+            ...scores[activePlayer],
+            totalPoints: newPoints + streakBonus,
+            tasksCompleted: scores[activePlayer].tasksCompleted + 1,
+            ...streakUpdates,
+          };
+
+          const newBadges = checkAndAwardBadges(activePlayer, tasks, shopping, { ...scores, [activePlayer]: newScore });
+          newScore.badges = [...newScore.badges, ...newBadges.map(b => ({ ...b, unlockedAt: now }))];
+
+          const newScores = { ...scores, [activePlayer]: newScore };
+          const totalNow = getTotalPoints(newScores);
+          const nextMilestone = MILESTONE_MESSAGES.find(m => m.points > previousMilestone && m.points <= totalNow);
+
+          if (SUPABASE_ENABLED) {
+            (async () => {
+              try {
+                await supabase.from('daily_completions').upsert({
+                  task_id: id,
+                  player: activePlayer,
+                  date: today,
+                  completed_at: now,
+                } as any);
+                await supabase.from('player_scores').update({
+                  total_points: newScore.totalPoints,
+                  tasks_completed: newScore.tasksCompleted,
+                  streak_days: newScore.streakDays,
+                  last_completed_date: newScore.lastCompletedDate,
+                }).eq('player', activePlayer);
+              } catch (err: any) { console.error('Supabase daily completion:', err); }
+            })();
+          }
+
+          set({
+            dailyCompletions: newDailyCompletions,
+            scores: newScores,
+            previousMilestone: nextMilestone ? nextMilestone.points : previousMilestone,
+          });
+
+          const name = scores[activePlayer].displayName;
+          get().addToast({
+            message: `Nice one, ${name}! +${task.points + streakBonus} pts`,
+            type: 'success',
+            points: task.points + streakBonus,
+            player: activePlayer,
+            taskId: id,
+            canUndo: true,
+          });
+          if (newBadges.length > 0) {
+            get().addToast({ message: `${newBadges[0].emoji} Badge unlocked: ${newBadges[0].name}!`, type: 'info' });
+          }
+          if (nextMilestone) get().addToast({ message: nextMilestone.message, type: 'info' });
+          if (streakBonus > 0) get().addToast({ message: `🔥 3-day streak! +${streakBonus} bonus pts`, type: 'info' });
+          return;
+        }
+
+        // Non-daily tasks: original flow
+        if (task.status === 'done') return;
 
         const now = new Date().toISOString();
         const streakUpdates = updateStreak(scores[activePlayer]);
@@ -488,32 +575,24 @@ export const useStore = create<AppState>()(
 
         const newScores = { ...scores, [activePlayer]: newScore };
         const totalNow = getTotalPoints(newScores);
-
-        // Check milestones
         const nextMilestone = MILESTONE_MESSAGES.find(m => m.points > previousMilestone && m.points <= totalNow);
 
-        // Sync to Supabase if enabled (fire and forget)
         if (SUPABASE_ENABLED) {
           (async () => {
             try {
-              await supabase.from('tasks').update({ 
-                status: 'done', 
-                completed_by: activePlayer, 
+              await supabase.from('tasks').update({
+                status: 'done',
+                completed_by: activePlayer,
                 completed_at: now,
-                claimed_by: null 
+                claimed_by: null,
               }).eq('id', id);
-              
               await supabase.from('player_scores').update({
                 total_points: newScore.totalPoints,
                 tasks_completed: newScore.tasksCompleted,
                 streak_days: newScore.streakDays,
-                last_completed_date: newScore.lastCompletedDate
+                last_completed_date: newScore.lastCompletedDate,
               }).eq('player', activePlayer);
-              
-              console.log('Synced to Supabase');
-            } catch (err: any) {
-              console.error('Supabase sync error:', err);
-            }
+            } catch (err: any) { console.error('Supabase sync error:', err); }
           })();
         }
 
@@ -523,7 +602,6 @@ export const useStore = create<AppState>()(
           previousMilestone: nextMilestone ? nextMilestone.points : previousMilestone,
         });
 
-        // Toast notifications
         const name = scores[activePlayer].displayName;
         get().addToast({
           message: `Nice one, ${name}! +${task.points + streakBonus} pts`,
@@ -533,27 +611,50 @@ export const useStore = create<AppState>()(
           taskId: id,
           canUndo: true,
         });
-
         if (newBadges.length > 0) {
-          get().addToast({
-            message: `${newBadges[0].emoji} Badge unlocked: ${newBadges[0].name}!`,
-            type: 'info',
-          });
+          get().addToast({ message: `${newBadges[0].emoji} Badge unlocked: ${newBadges[0].name}!`, type: 'info' });
         }
-
-        if (nextMilestone) {
-          get().addToast({ message: nextMilestone.message, type: 'info' });
-        }
-
-        if (streakBonus > 0) {
-          get().addToast({ message: `🔥 3-day streak! +${streakBonus} bonus pts`, type: 'info' });
-        }
+        if (nextMilestone) get().addToast({ message: nextMilestone.message, type: 'info' });
+        if (streakBonus > 0) get().addToast({ message: `🔥 3-day streak! +${streakBonus} bonus pts`, type: 'info' });
       },
 
       uncompleteTask: (id) => {
         set(s => {
           const task = s.tasks.find(t => t.id === id);
-          if (!task || task.status !== 'done' || !task.completedBy) return s;
+          if (!task) return s;
+
+          const today = getTodayDate();
+
+          // Daily tasks: remove today's completion
+          if (task.isDaily) {
+            const completion = s.dailyCompletions.find(c => c.taskId === id && c.date === today);
+            if (!completion) return s;
+            const player = completion.player;
+            const dailyCompletions = s.dailyCompletions.filter(c => !(c.taskId === id && c.date === today));
+            const scores = {
+              ...s.scores,
+              [player]: {
+                ...s.scores[player],
+                totalPoints: Math.max(0, s.scores[player].totalPoints - task.points),
+                tasksCompleted: Math.max(0, s.scores[player].tasksCompleted - 1),
+              },
+            };
+            if (SUPABASE_ENABLED) {
+              (async () => {
+                try {
+                  await supabase.from('daily_completions').delete().eq('task_id', id).eq('date', today);
+                  await supabase.from('player_scores').update({
+                    total_points: scores[player].totalPoints,
+                    tasks_completed: scores[player].tasksCompleted,
+                  }).eq('player', player);
+                } catch (err: any) { console.error('Supabase uncomplete daily:', err); }
+              })();
+            }
+            return { dailyCompletions, scores };
+          }
+
+          // Non-daily tasks
+          if (task.status !== 'done' || !task.completedBy) return s;
           const player = task.completedBy;
           const tasks = s.tasks.map(t =>
             t.id === id ? { ...t, status: 'pending' as const, completedBy: undefined, completedAt: undefined } : t
@@ -892,6 +993,7 @@ export const useStore = create<AppState>()(
         tasks: state.tasks,
         shopping: state.shopping,
         goals: state.goals,
+        dailyCompletions: state.dailyCompletions,
         scores: state.scores,
         settings: state.settings,
         activePlayer: state.activePlayer,

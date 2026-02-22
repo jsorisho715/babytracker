@@ -67,6 +67,15 @@ CREATE TABLE IF NOT EXISTS app_settings (
 INSERT INTO app_settings (id, baby_name) VALUES ('default', 'Luca')
 ON CONFLICT (id) DO NOTHING;
 
+-- Create daily_completions table (per-day completion for daily tasks)
+CREATE TABLE IF NOT EXISTS daily_completions (
+  task_id TEXT NOT NULL,
+  player TEXT NOT NULL,
+  date TEXT NOT NULL,
+  completed_at TIMESTAMP DEFAULT NOW(),
+  PRIMARY KEY (task_id, date)
+);
+
 -- Create player_scores table
 CREATE TABLE IF NOT EXISTS player_scores (
   player TEXT PRIMARY KEY,
@@ -98,6 +107,7 @@ ALTER TABLE shopping_items ENABLE ROW LEVEL SECURITY;
 ALTER TABLE goals ENABLE ROW LEVEL SECURITY;
 ALTER TABLE player_scores ENABLE ROW LEVEL SECURITY;
 ALTER TABLE badges ENABLE ROW LEVEL SECURITY;
+ALTER TABLE daily_completions ENABLE ROW LEVEL SECURITY;
 
 -- Create RLS policies (allow all for now - you can lock down later)
 CREATE POLICY "Allow all" ON app_settings FOR ALL USING (true) WITH CHECK (true);
@@ -106,6 +116,7 @@ CREATE POLICY "Allow all" ON shopping_items FOR ALL USING (true) WITH CHECK (tru
 CREATE POLICY "Allow all" ON goals FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Allow all" ON player_scores FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Allow all" ON badges FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow all" ON daily_completions FOR ALL USING (true) WITH CHECK (true);
 
 -- Initialize player scores
 INSERT INTO player_scores (player, display_name) VALUES ('johnathan', 'Johnathan')

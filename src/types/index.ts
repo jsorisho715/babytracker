@@ -76,5 +76,12 @@ export interface Toast {
   canUndo?: boolean;
 }
 
+export interface DailyCompletion {
+  taskId: string;
+  player: Player;
+  date: string; // YYYY-MM-DD
+  completedAt?: string;
+}
+
 export type NavTab = 'dashboard' | 'tasks' | 'shopping' | 'goals' | 'assigned';
 export type ItemType = 'task' | 'shopping' | 'goal';
