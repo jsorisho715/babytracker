@@ -171,14 +171,18 @@ export const useStore = create<AppState>()(
         
         // If Supabase is enabled, try to load from there
         if (SUPABASE_ENABLED) {
+          // Fetch daily_completions separately so a missing table doesn't break the whole load
+          const fetchDailyCompletions = (): Promise<{ data: any[] }> =>
+            (supabase.from('daily_completions').select('*') as any).then((r: any) => r).catch(() => ({ data: [] as any[] }));
+
           return Promise.all([
             supabase.from('tasks').select('*'),
             supabase.from('shopping_items').select('*'),
             supabase.from('goals').select('*'),
-            supabase.from('daily_completions').select('*'),
+            fetchDailyCompletions(),
             supabase.from('player_scores').select('*'),
             supabase.from('app_settings').select('*').eq('id', 'default').maybeSingle()
-          ]).then(([tasksRes, shoppingRes, goalsRes, completionsRes, scoresRes, settingsRes]) => {
+          ]).then(([tasksRes, shoppingRes, goalsRes, completionsRes, scoresRes, settingsRes]: any[]) => {
             const settingsRow = settingsRes.data;
             const settings = settingsRow ? {
               babyName: settingsRow.baby_name ?? 'Luca',
@@ -187,7 +191,7 @@ export const useStore = create<AppState>()(
             } : get().settings;
 
             if (tasksRes.data?.length || force) {
-              const tasks = (tasksRes.data || []).map(t => ({
+              const tasks = (tasksRes.data || []).map((t: any) => ({
                 ...t,
                 points: t.points as any,
                 status: t.status as any,
@@ -198,13 +202,13 @@ export const useStore = create<AppState>()(
                 isDaily: t.is_daily ?? false,
                 assignedToBoth: t.assigned_to_both ?? false,
               }));
-              const shopping = shoppingRes.data?.map(s => ({
+              const shopping = shoppingRes.data?.map((s: any) => ({
                 ...s,
                 points: s.points as any,
                 status: s.status as any
               })) ?? [];
               const goals = goalsRes.data ?? [];
-              const dailyCompletions: DailyCompletion[] = (completionsRes.data ?? []).map((c: any) => ({
+              const dailyCompletions: DailyCompletion[] = ((completionsRes as any).data ?? []).map((c: any) => ({
                 taskId: c.task_id,
                 player: c.player as Player,
                 date: c.date,
@@ -224,8 +228,8 @@ export const useStore = create<AppState>()(
               });
 
               const scores: Record<Player, PlayerScore> = {
-                johnathan: mapScore(playerScores.find(s => s.player === 'johnathan'), DEFAULT_SCORES.johnathan),
-                jordyn: mapScore(playerScores.find(s => s.player === 'jordyn'), DEFAULT_SCORES.jordyn),
+                johnathan: mapScore(playerScores.find((s: any) => s.player === 'johnathan'), DEFAULT_SCORES.johnathan),
+                jordyn: mapScore(playerScores.find((s: any) => s.player === 'jordyn'), DEFAULT_SCORES.jordyn),
               };
 
               set({ tasks, shopping, goals, dailyCompletions, scores, settings, isLoaded: true });
@@ -235,8 +239,13 @@ export const useStore = create<AppState>()(
               get().syncToSupabase();
             }
           }).catch(() => {
-            // Fallback to seeds if Supabase fails
-            set({ tasks: seedTasks, shopping: seedShoppingItems, goals: seedGoals, dailyCompletions: [], isLoaded: true });
+            // Fallback: keep existing state but mark as loaded so the app doesn't blank out
+            const existing = get();
+            if (existing.tasks.length > 0) {
+              set({ isLoaded: true });
+            } else {
+              set({ tasks: seedTasks, shopping: seedShoppingItems, goals: seedGoals, dailyCompletions: [], isLoaded: true });
+            }
           }) as Promise<void>;
         } else {
           // LocalStorage only
@@ -312,6 +321,24 @@ export const useStore = create<AppState>()(
       addTask: (taskData) => {
         const task: Task = { ...taskData, id: generateId() };
         set(s => ({ tasks: [...s.tasks, task] }));
+        if (SUPABASE_ENABLED) {
+          (async () => {
+            try {
+              await supabase.from('tasks').insert({
+                id: task.id,
+                task: task.task,
+                category: task.category,
+                priority: task.priority,
+                timing: task.timing,
+                status: task.status,
+                notes: task.notes ?? null,
+                points: task.points,
+                is_daily: task.isDaily ?? false,
+                assigned_to_both: task.assignedToBoth ?? false,
+              } as any);
+            } catch (err: any) { console.error('Supabase addTask:', err); }
+          })();
+        }
       },
 
       updateTask: (id, updates) => {
@@ -358,20 +385,35 @@ export const useStore = create<AppState>()(
       },
 
       deleteTask: (id) => {
+        const task = get().tasks.find(t => t.id === id);
         set(s => {
-          const task = s.tasks.find(t => t.id === id);
           const tasks = s.tasks.filter(t => t.id !== id);
           if (task?.status === 'done' && task.completedBy) {
             const player = task.completedBy;
-            const scores = {
-              ...s.scores,
-              [player]: {
-                ...s.scores[player],
-                totalPoints: Math.max(0, s.scores[player].totalPoints - task.points),
-                tasksCompleted: Math.max(0, s.scores[player].tasksCompleted - 1),
-              },
+            const newScore = {
+              ...s.scores[player],
+              totalPoints: Math.max(0, s.scores[player].totalPoints - task.points),
+              tasksCompleted: Math.max(0, s.scores[player].tasksCompleted - 1),
             };
-            return { tasks, scores };
+            if (SUPABASE_ENABLED) {
+              (async () => {
+                try {
+                  await supabase.from('tasks').delete().eq('id', id);
+                  await supabase.from('player_scores').update({
+                    total_points: newScore.totalPoints,
+                    tasks_completed: newScore.tasksCompleted,
+                  }).eq('player', player);
+                } catch (err: any) { console.error('Supabase deleteTask:', err); }
+              })();
+            }
+            return { tasks, scores: { ...s.scores, [player]: newScore } };
+          }
+          if (SUPABASE_ENABLED) {
+            (async () => {
+              try {
+                await supabase.from('tasks').delete().eq('id', id);
+              } catch (err: any) { console.error('Supabase deleteTask:', err); }
+            })();
           }
           return { tasks };
         });
@@ -382,15 +424,20 @@ export const useStore = create<AppState>()(
         set(s => ({
           tasks: s.tasks.map(t =>
             t.id === id && t.status === 'pending'
-              ? { ...t, status: 'claimed', claimedBy: activePlayer, assignedBy: undefined }
+              ? { ...t, status: 'claimed', claimedBy: activePlayer, assignedBy: undefined, assignedToBoth: false }
               : t
           ),
         }));
         if (SUPABASE_ENABLED) {
           (async () => {
             try {
-              await supabase.from('tasks').update({ status: 'claimed', claimed_by: get().activePlayer, assigned_by: null }).eq('id', id);
-            } catch (err: any) { console.error('Supabase sync error:', err); }
+              await supabase.from('tasks').update({
+                status: 'claimed',
+                claimed_by: get().activePlayer,
+                assigned_by: null,
+                assigned_to_both: false,
+              }).eq('id', id);
+            } catch (err: any) { console.error('Supabase claimTask sync:', err); }
           })();
         }
       },
@@ -398,14 +445,16 @@ export const useStore = create<AppState>()(
       assignTask: (taskId, assignTo) => {
         const { activePlayer } = get();
         const isSelf = assignTo === activePlayer;
+        const canAssign = (t: Task) => t.id === taskId && (t.status === 'pending' || t.status === 'claimed');
         set(s => ({
           tasks: s.tasks.map(t =>
-            t.id === taskId && t.status === 'pending'
+            canAssign(t)
               ? {
                   ...t,
-                  status: 'claimed',
+                  status: 'claimed' as const,
                   claimedBy: assignTo,
                   assignedBy: isSelf ? undefined : activePlayer,
+                  assignedToBoth: false,
                 }
               : t
           ),
@@ -417,8 +466,9 @@ export const useStore = create<AppState>()(
                 status: 'claimed',
                 claimed_by: assignTo,
                 assigned_by: isSelf ? null : activePlayer,
+                assigned_to_both: false,
               }).eq('id', taskId);
-            } catch (err: any) { console.error('Supabase sync error:', err); }
+            } catch (err: any) { console.error('Supabase assignTask sync:', err); }
           })();
         }
         const assigneeName = isSelf ? 'yourself' : assignTo === 'johnathan' ? 'Johnathan' : 'Jordyn';
@@ -427,7 +477,7 @@ export const useStore = create<AppState>()(
 
       assignTaskToBoth: (taskId) => {
         const task = get().tasks.find(t => t.id === taskId);
-        if (!task || task.status !== 'pending') return;
+        if (!task || task.status === 'done') return;
         set(s => ({
           tasks: s.tasks.map(t =>
             t.id === taskId
@@ -444,7 +494,7 @@ export const useStore = create<AppState>()(
                 claimed_by: null,
                 assigned_by: null,
               }).eq('id', taskId);
-            } catch (err: any) { console.error('Supabase sync error:', err); }
+            } catch (err: any) { console.error('Supabase assignTaskToBoth sync:', err); }
           })();
         }
         get().addToast({ message: '🤝 Team Luca task! Complete it together.', type: 'info' });
@@ -659,14 +709,28 @@ export const useStore = create<AppState>()(
           const tasks = s.tasks.map(t =>
             t.id === id ? { ...t, status: 'pending' as const, completedBy: undefined, completedAt: undefined } : t
           );
-          const scores = {
-            ...s.scores,
-            [player]: {
-              ...s.scores[player],
-              totalPoints: Math.max(0, s.scores[player].totalPoints - task.points),
-              tasksCompleted: Math.max(0, s.scores[player].tasksCompleted - 1),
-            },
+          const newScore = {
+            ...s.scores[player],
+            totalPoints: Math.max(0, s.scores[player].totalPoints - task.points),
+            tasksCompleted: Math.max(0, s.scores[player].tasksCompleted - 1),
           };
+          const scores = { ...s.scores, [player]: newScore };
+          if (SUPABASE_ENABLED) {
+            (async () => {
+              try {
+                await supabase.from('tasks').update({
+                  status: 'pending',
+                  completed_by: null,
+                  completed_at: null,
+                  claimed_by: null,
+                }).eq('id', id);
+                await supabase.from('player_scores').update({
+                  total_points: newScore.totalPoints,
+                  tasks_completed: newScore.tasksCompleted,
+                }).eq('player', player);
+              } catch (err: any) { console.error('Supabase uncompleteTask:', err); }
+            })();
+          }
           return { tasks, scores };
         });
       },
@@ -674,13 +738,57 @@ export const useStore = create<AppState>()(
       addShoppingItem: (itemData) => {
         const item: ShoppingItem = { ...itemData, id: generateId() };
         set(s => ({ shopping: [...s.shopping, item] }));
+        if (SUPABASE_ENABLED) {
+          (async () => {
+            try {
+              await supabase.from('shopping_items').insert({
+                id: item.id,
+                name: item.name,
+                notes: item.notes ?? null,
+                price: item.price ?? null,
+                stock: item.stock ?? null,
+                points: item.points,
+                status: item.status,
+              } as any);
+            } catch (err: any) { console.error('Supabase addShoppingItem:', err); }
+          })();
+        }
       },
 
       updateShoppingItem: (id, updates) => {
         set(s => {
           const shopping = s.shopping.map(i => i.id === id ? { ...i, ...updates } : i);
+          const updated = shopping.find(i => i.id === id);
           const original = s.shopping.find(i => i.id === id);
-          if (original?.status === 'Purchased' && updates.status === 'Need to Purchase' && original.purchasedBy) {
+          const isUnpurchasing = original?.status === 'Purchased' && updates.status === 'Need to Purchase' && original.purchasedBy;
+          if (SUPABASE_ENABLED && updated) {
+            (async () => {
+              try {
+                await supabase.from('shopping_items').update({
+                  name: updated.name,
+                  notes: updated.notes ?? null,
+                  price: updated.price ?? null,
+                  stock: updated.stock ?? null,
+                  status: updated.status,
+                  points: updated.points,
+                  purchased_by: updated.purchasedBy ?? null,
+                  purchased_at: updated.purchasedAt ?? null,
+                } as any).eq('id', id);
+                if (isUnpurchasing && original?.purchasedBy) {
+                  const newScore = {
+                    ...s.scores[original.purchasedBy],
+                    totalPoints: Math.max(0, s.scores[original.purchasedBy].totalPoints - original.points),
+                    tasksCompleted: Math.max(0, s.scores[original.purchasedBy].tasksCompleted - 1),
+                  };
+                  await supabase.from('player_scores').update({
+                    total_points: newScore.totalPoints,
+                    tasks_completed: newScore.tasksCompleted,
+                  }).eq('player', original.purchasedBy);
+                }
+              } catch (err: any) { console.error('Supabase updateShoppingItem:', err); }
+            })();
+          }
+          if (isUnpurchasing && original?.purchasedBy) {
             const player = original.purchasedBy;
             const scores = {
               ...s.scores,
@@ -697,20 +805,35 @@ export const useStore = create<AppState>()(
       },
 
       deleteShoppingItem: (id) => {
+        const item = get().shopping.find(i => i.id === id);
         set(s => {
-          const item = s.shopping.find(i => i.id === id);
           const shopping = s.shopping.filter(i => i.id !== id);
           if (item?.status === 'Purchased' && item.purchasedBy) {
             const player = item.purchasedBy;
-            const scores = {
-              ...s.scores,
-              [player]: {
-                ...s.scores[player],
-                totalPoints: Math.max(0, s.scores[player].totalPoints - item.points),
-                tasksCompleted: Math.max(0, s.scores[player].tasksCompleted - 1),
-              },
+            const newScore = {
+              ...s.scores[player],
+              totalPoints: Math.max(0, s.scores[player].totalPoints - item.points),
+              tasksCompleted: Math.max(0, s.scores[player].tasksCompleted - 1),
             };
-            return { shopping, scores };
+            if (SUPABASE_ENABLED) {
+              (async () => {
+                try {
+                  await supabase.from('shopping_items').delete().eq('id', id);
+                  await supabase.from('player_scores').update({
+                    total_points: newScore.totalPoints,
+                    tasks_completed: newScore.tasksCompleted,
+                  }).eq('player', player);
+                } catch (err: any) { console.error('Supabase deleteShoppingItem:', err); }
+              })();
+            }
+            return { shopping, scores: { ...s.scores, [player]: newScore } };
+          }
+          if (SUPABASE_ENABLED) {
+            (async () => {
+              try {
+                await supabase.from('shopping_items').delete().eq('id', id);
+              } catch (err: any) { console.error('Supabase deleteShoppingItem:', err); }
+            })();
           }
           return { shopping };
         });
@@ -736,6 +859,22 @@ export const useStore = create<AppState>()(
         newScore.badges = [...newScore.badges, ...newBadges.map(b => ({ ...b, unlockedAt: now }))];
 
         set({ shopping: updatedShopping, scores: { ...scores, [activePlayer]: newScore } });
+
+        if (SUPABASE_ENABLED) {
+          (async () => {
+            try {
+              await supabase.from('shopping_items').update({
+                status: 'Purchased',
+                purchased_by: activePlayer,
+                purchased_at: now,
+              } as any).eq('id', id);
+              await supabase.from('player_scores').update({
+                total_points: newScore.totalPoints,
+                tasks_completed: newScore.tasksCompleted,
+              }).eq('player', activePlayer);
+            } catch (err: any) { console.error('Supabase purchaseItem:', err); }
+          })();
+        }
 
         const name = scores[activePlayer].displayName;
         get().addToast({
@@ -763,14 +902,27 @@ export const useStore = create<AppState>()(
           const shopping = s.shopping.map(i =>
             i.id === id ? { ...i, status: 'Need to Purchase' as const, purchasedBy: undefined, purchasedAt: undefined } : i
           );
-          const scores = {
-            ...s.scores,
-            [player]: {
-              ...s.scores[player],
-              totalPoints: Math.max(0, s.scores[player].totalPoints - item.points),
-              tasksCompleted: Math.max(0, s.scores[player].tasksCompleted - 1),
-            },
+          const newScore = {
+            ...s.scores[player],
+            totalPoints: Math.max(0, s.scores[player].totalPoints - item.points),
+            tasksCompleted: Math.max(0, s.scores[player].tasksCompleted - 1),
           };
+          const scores = { ...s.scores, [player]: newScore };
+          if (SUPABASE_ENABLED) {
+            (async () => {
+              try {
+                await supabase.from('shopping_items').update({
+                  status: 'Need to Purchase',
+                  purchased_by: null,
+                  purchased_at: null,
+                } as any).eq('id', id);
+                await supabase.from('player_scores').update({
+                  total_points: newScore.totalPoints,
+                  tasks_completed: newScore.tasksCompleted,
+                }).eq('player', player);
+              } catch (err: any) { console.error('Supabase unpurchaseItem:', err); }
+            })();
+          }
           return { shopping, scores };
         });
       },
@@ -778,23 +930,75 @@ export const useStore = create<AppState>()(
       addGoal: (goalData) => {
         const goal: Goal = { ...goalData, id: generateId() };
         set(s => ({ goals: [...s.goals, goal] }));
+        if (SUPABASE_ENABLED) {
+          (async () => {
+            try {
+              await supabase.from('goals').insert({
+                id: goal.id,
+                name: goal.name,
+                notes: goal.notes ?? null,
+                start_date: goal.startDate ?? null,
+                end_date: goal.endDate ?? null,
+                completed: goal.completed ?? false,
+              } as any);
+            } catch (err: any) { console.error('Supabase addGoal:', err); }
+          })();
+        }
       },
 
       updateGoal: (id, updates) => {
         set(s => ({ goals: s.goals.map(g => g.id === id ? { ...g, ...updates } : g) }));
+        if (SUPABASE_ENABLED) {
+          (async () => {
+            try {
+              const updated = get().goals.find(g => g.id === id);
+              if (!updated) return;
+              await supabase.from('goals').update({
+                name: updated.name,
+                notes: updated.notes ?? null,
+                start_date: updated.startDate ?? null,
+                end_date: updated.endDate ?? null,
+                completed: updated.completed ?? false,
+                completed_by: updated.completedBy ?? null,
+                completed_at: updated.completedAt ?? null,
+              } as any).eq('id', id);
+            } catch (err: any) { console.error('Supabase updateGoal:', err); }
+          })();
+        }
       },
 
       deleteGoal: (id) => {
         set(s => ({ goals: s.goals.filter(g => g.id !== id) }));
+        if (SUPABASE_ENABLED) {
+          (async () => {
+            try {
+              await supabase.from('goals').delete().eq('id', id);
+            } catch (err: any) { console.error('Supabase deleteGoal:', err); }
+          })();
+        }
       },
 
       completeGoal: (id) => {
         const { activePlayer } = get();
+        const now = new Date().toISOString();
+        const existing = get().goals.find(g => g.id === id);
+        const newCompleted = !existing?.completed;
         set(s => ({
           goals: s.goals.map(g =>
-            g.id === id ? { ...g, completed: !g.completed, completedBy: activePlayer, completedAt: new Date().toISOString() } : g
+            g.id === id ? { ...g, completed: newCompleted, completedBy: activePlayer, completedAt: now } : g
           ),
         }));
+        if (SUPABASE_ENABLED) {
+          (async () => {
+            try {
+              await supabase.from('goals').update({
+                completed: newCompleted,
+                completed_by: activePlayer,
+                completed_at: now,
+              } as any).eq('id', id);
+            } catch (err: any) { console.error('Supabase completeGoal:', err); }
+          })();
+        }
       },
 
       convertTaskToShopping: (taskId) => {

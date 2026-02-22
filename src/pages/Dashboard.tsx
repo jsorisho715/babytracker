@@ -195,9 +195,11 @@ function DailySection() {
   const isDoneToday = (taskId: string) =>
     dailyCompletions.some(c => c.taskId === taskId && c.date === today);
 
+  // Show daily tasks that are unassigned, assigned to me, or team tasks.
+  // Use !t.claimedBy as a fallback for team tasks where assignedToBoth may have lost sync.
   const dailyTasks = tasks.filter(t =>
     t.isDaily &&
-    (t.claimedBy === activePlayer || t.status === 'pending' || t.assignedToBoth)
+    (t.assignedToBoth || !t.claimedBy || t.claimedBy === activePlayer)
   );
 
   if (dailyTasks.length === 0) {
