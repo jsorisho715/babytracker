@@ -336,23 +336,29 @@ export const useStore = create<AppState>()(
         // Check milestones
         const nextMilestone = MILESTONE_MESSAGES.find(m => m.points > previousMilestone && m.points <= totalNow);
 
-        // Sync to Supabase if enabled
+        // Sync to Supabase if enabled (fire and forget)
         if (SUPABASE_ENABLED) {
-          supabase.from('tasks').update({ 
-            status: 'done', 
-            completed_by: activePlayer, 
-            completed_at: now,
-            claimed_by: null 
-          }).eq('id', id).then(() => {
-            supabase.from('player_scores').update({
-              total_points: newScore.totalPoints,
-              tasks_completed: newScore.tasksCompleted,
-              streak_days: newScore.streakDays,
-              last_completed_date: newScore.lastCompletedDate
-            }).eq('player', activePlayer).then(() => {
+          (async () => {
+            try {
+              await supabase.from('tasks').update({ 
+                status: 'done', 
+                completed_by: activePlayer, 
+                completed_at: now,
+                claimed_by: null 
+              }).eq('id', id);
+              
+              await supabase.from('player_scores').update({
+                total_points: newScore.totalPoints,
+                tasks_completed: newScore.tasksCompleted,
+                streak_days: newScore.streakDays,
+                last_completed_date: newScore.lastCompletedDate
+              }).eq('player', activePlayer);
+              
               console.log('Synced to Supabase');
-            }).catch((err: any) => console.error('Supabase sync error:', err));
-          }).catch((err: any) => console.error('Supabase sync error:', err));
+            } catch (err: any) {
+              console.error('Supabase sync error:', err);
+            }
+          })();
         }
 
         set({
