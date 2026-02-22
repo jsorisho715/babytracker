@@ -4,7 +4,7 @@ import { useStore } from '../store/useStore';
 import { CATEGORY_EMOJIS } from '../data/seedData';
 import type { Player, PointTier, Task } from '../types';
 import PointsBadge from '../components/PointsBadge';
-import { Trophy, Flame, Star, ChevronRight, ClipboardList, RefreshCw, CheckSquare, ShoppingCart, Target, CheckCircle2 } from 'lucide-react';
+import { Trophy, Flame, Star, ChevronRight, ClipboardList, RefreshCw, CheckSquare, ShoppingCart, Target, CheckCircle2, UserX } from 'lucide-react';
 
 function PlayerCard({ player }: { player: Player }) {
   const { scores, tasks, shopping } = useStore();
@@ -209,6 +209,9 @@ function QuickStats() {
   const completedTasks = tasks.filter(t => t.status === 'done').length;
   const purchasedShopping = shopping.filter(s => s.status === 'Purchased').length;
   const completedGoals = goals.filter(g => g.completed).length;
+  const unassignedTasks = tasks.filter(
+    t => t.status !== 'done' && !t.isDaily && !t.claimedBy && !t.assignedToBoth
+  ).length;
 
   const dailyTasks = tasks.filter(t =>
     t.isDaily && (t.assignedToBoth || !t.claimedBy || t.claimedBy === activePlayer)
@@ -258,6 +261,14 @@ function QuickStats() {
       color: 'text-sky-500',
       bg: 'bg-sky-50',
       tab: 'tasks' as const,
+    },
+    {
+      label: 'Unassigned',
+      value: unassignedTasks,
+      icon: <UserX className="w-4 h-4" />,
+      color: 'text-orange-500',
+      bg: 'bg-orange-50',
+      tab: 'assigned' as const,
     },
   ];
 

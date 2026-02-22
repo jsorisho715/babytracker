@@ -281,7 +281,7 @@ function AssignedTaskCard({ task, onEdit }: { task: Task; onEdit: () => void }) 
   );
 }
 
-type AssignedFilter = 'all' | 'to-me' | 'assigned-by-me';
+type AssignedFilter = 'all' | 'to-me' | 'assigned-by-me' | 'unassigned';
 
 const byPointsDesc = (a: Task, b: Task) => (b.points ?? 0) - (a.points ?? 0);
 
@@ -306,12 +306,18 @@ export default function Assigned() {
   // Team tasks
   const teamTasks = tasks.filter(t => t.assignedToBoth && t.status !== 'done');
 
+  // Unassigned tasks — pending, non-daily, no claimedBy, not team
+  const unassignedTasks = tasks.filter(
+    t => t.status !== 'done' && !t.isDaily && !t.claimedBy && !t.assignedToBoth
+  );
+
   const displayed =
-    filter === 'to-me' ? toMe :
+    filter === 'to-me'          ? toMe :
     filter === 'assigned-by-me' ? myTasks :
+    filter === 'unassigned'     ? unassignedTasks :
     [...new Map([...toMe, ...myTasks.filter(t => !t.assignedToBoth && t.claimedBy !== activePlayer), ...teamTasks].map(t => [t.id, t])).values()];
 
-  const hasAny = toMe.length > 0 || myTasks.length > 0 || teamTasks.length > 0;
+  const hasAny = toMe.length > 0 || myTasks.length > 0 || teamTasks.length > 0 || unassignedTasks.length > 0;
 
   // Group displayed tasks by category in TASK_CATEGORIES order
   const allCategories = [...TASK_CATEGORIES, 'Other'];
@@ -342,24 +348,38 @@ export default function Assigned() {
   return (
     <div className="space-y-4">
       {/* Stats */}
-      <div className="grid grid-cols-2 gap-3">
-        <div className="card text-center min-h-[72px] flex flex-col items-center justify-center">
-          <p className="text-2xl font-display font-800 text-gray-800">{displayed.length}</p>
+      <div className="grid grid-cols-3 gap-2">
+        <button
+          onClick={() => setFilter('all')}
+          className="card text-center min-h-[72px] flex flex-col items-center justify-center active:scale-95 transition-transform"
+        >
+          <p className="text-2xl font-display font-800 text-gray-800">{toMe.length + myTasks.filter(t => !t.assignedToBoth && t.claimedBy !== activePlayer).length + teamTasks.length}</p>
           <p className="text-xs text-warm-gray font-display font-600">total assigned</p>
-        </div>
-        <div className="card text-center min-h-[72px] flex flex-col items-center justify-center">
+        </button>
+        <button
+          onClick={() => setFilter('to-me')}
+          className="card text-center min-h-[72px] flex flex-col items-center justify-center active:scale-95 transition-transform"
+        >
           <p className="text-2xl font-display font-800 text-rose-medium">{toMe.length}</p>
           <p className="text-xs text-warm-gray font-display font-600">my tasks</p>
-        </div>
+        </button>
+        <button
+          onClick={() => setFilter('unassigned')}
+          className="card text-center min-h-[72px] flex flex-col items-center justify-center active:scale-95 transition-transform"
+        >
+          <p className="text-2xl font-display font-800 text-orange-500">{unassignedTasks.length}</p>
+          <p className="text-xs text-warm-gray font-display font-600">unassigned</p>
+        </button>
       </div>
 
       {/* Filter tabs — horizontally scrollable on mobile */}
       <div className="overflow-x-auto -mx-4 px-4">
         <div className="flex gap-1.5 min-w-max">
           {([
-            { key: 'all', label: `All (${displayed.length})` },
+            { key: 'all', label: `All (${toMe.length + myTasks.filter(t => !t.assignedToBoth && t.claimedBy !== activePlayer).length + teamTasks.length})` },
             { key: 'to-me', label: `To me (${toMe.length})` },
             { key: 'assigned-by-me', label: `Assigned by me (${myTasks.length})` },
+            { key: 'unassigned', label: `Unassigned (${unassignedTasks.length})` },
           ] as { key: AssignedFilter; label: string }[]).map(({ key, label }) => (
             <button
               key={key}
