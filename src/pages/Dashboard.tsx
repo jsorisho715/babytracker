@@ -108,55 +108,6 @@ function CategoryProgress() {
   );
 }
 
-function SuggestedTasks() {
-  const { tasks, activePlayer, claimTask, completeTask, setActiveTab } = useStore();
-  const suggested = tasks
-    .filter(t => t.status === 'pending' || (t.status === 'claimed' && t.claimedBy === activePlayer))
-    .sort((a, b) => {
-      if (a.priority === 'High' && b.priority !== 'High') return -1;
-      if (b.priority === 'High' && a.priority !== 'High') return 1;
-      return a.points - b.points;
-    })
-    .slice(0, 3);
-
-  if (suggested.length === 0) return null;
-
-  return (
-    <div className="card">
-      <div className="flex items-center justify-between mb-3">
-        <h3 className="font-display font-700 text-gray-800">Quick Wins for You</h3>
-        <button onClick={() => setActiveTab('tasks')} className="text-xs text-sage-500 font-display font-600">
-          See all
-        </button>
-      </div>
-      <div className="space-y-2">
-        {suggested.map(task => (
-          <div key={task.id} className="flex items-center gap-3 p-2.5 bg-cream-50 rounded-2xl">
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-display font-600 text-gray-800 truncate">{task.task}</p>
-              <p className="text-xs text-warm-gray">{task.category}</p>
-            </div>
-            <PointsBadge points={task.points as PointTier} />
-            <button
-              onClick={() => {
-                if (task.status === 'pending') claimTask(task.id);
-                else completeTask(task.id);
-              }}
-              className={`text-xs font-display font-700 px-3 py-1.5 rounded-xl transition-all ${
-                task.status === 'pending'
-                  ? 'bg-sage-100 text-sage-600 hover:bg-sage-200'
-                  : 'bg-sage-400 text-white hover:bg-sage-500'
-              }`}
-            >
-              {task.status === 'pending' ? 'Claim' : 'Done!'}
-            </button>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
 function AssignedCard() {
   const { tasks, activePlayer, scores, setActiveTab } = useStore();
   const otherPlayer: Player = activePlayer === 'johnathan' ? 'jordyn' : 'johnathan';
@@ -407,9 +358,6 @@ export default function Dashboard() {
             <PlayerCard player="johnathan" />
             <PlayerCard player="jordyn" />
           </div>
-
-          {/* Suggested Tasks */}
-          <SuggestedTasks />
 
           {/* Category Progress */}
           <CategoryProgress />
