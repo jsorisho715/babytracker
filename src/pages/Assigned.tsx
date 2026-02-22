@@ -258,124 +258,126 @@ function AssignedTaskCard({ task, onEdit }: { task: Task; onEdit: () => void }) 
   );
 }
 
+type AssignedFilter = 'all' | 'to-me' | 'by-me';
+
 export default function Assigned() {
   const { tasks, activePlayer, scores, updateTask } = useStore();
   const [editId, setEditId] = useState<string | null>(null);
-  const [showByMe, setShowByMe] = useState(true);
+  const [filter, setFilter] = useState<AssignedFilter>('all');
 
   const otherPlayer: Player = activePlayer === 'johnathan' ? 'jordyn' : 'johnathan';
+  const myName = scores[activePlayer].displayName;
+  const otherName = scores[otherPlayer].displayName;
 
-  const assignedToMe = tasks.filter(
-    t => t.claimedBy === activePlayer && t.assignedBy === otherPlayer && t.status !== 'done'
+  // Tasks claimed by me (partner-assigned OR self-assigned), not done
+  const toMe = tasks.filter(
+    t => t.claimedBy === activePlayer && t.status !== 'done'
   );
 
-  const assignedByMe = tasks.filter(
+  // Tasks I assigned to my partner, not done
+  const byMe = tasks.filter(
     t => t.assignedBy === activePlayer && t.status !== 'done'
   );
 
-  const hasAny = assignedToMe.length > 0 || assignedByMe.length > 0;
+  const displayed =
+    filter === 'to-me' ? toMe :
+    filter === 'by-me' ? byMe :
+    // "all" — union, deduped by id
+    [...toMe, ...byMe.filter(t => t.claimedBy !== activePlayer)];
+
+  const hasAny = toMe.length > 0 || byMe.length > 0;
+
+  const renderCard = (task: Task) => (
+    editId === task.id ? (
+      <TaskForm
+        key={task.id}
+        initial={task}
+        onSave={data => { updateTask(task.id, data); setEditId(null); }}
+        onCancel={() => setEditId(null)}
+      />
+    ) : (
+      <AssignedTaskCard
+        key={task.id}
+        task={task}
+        onEdit={() => setEditId(task.id)}
+      />
+    )
+  );
 
   return (
     <div className="space-y-4">
-      {/* Header stat */}
+      {/* Stats */}
       <div className="grid grid-cols-2 gap-3">
         <div className="card text-center">
-          <p className="text-2xl font-display font-800 text-rose-medium">{assignedToMe.length}</p>
-          <p className="text-xs text-warm-gray font-display font-600">Assigned to me</p>
+          <p className="text-2xl font-display font-800 text-rose-medium">{toMe.length}</p>
+          <p className="text-xs text-warm-gray font-display font-600">Claimed by {myName}</p>
         </div>
         <div className="card text-center">
-          <p className="text-2xl font-display font-800 text-sage-500">{assignedByMe.length}</p>
-          <p className="text-xs text-warm-gray font-display font-600">I assigned out</p>
+          <p className="text-2xl font-display font-800 text-sage-500">{byMe.length}</p>
+          <p className="text-xs text-warm-gray font-display font-600">{myName} assigned out</p>
         </div>
       </div>
 
+      {/* Filter tabs */}
+      <div className="flex gap-1.5">
+        {([
+          { key: 'all', label: `All (${toMe.length + byMe.filter(t => t.claimedBy !== activePlayer).length})` },
+          { key: 'to-me', label: `To ${myName} (${toMe.length})` },
+          { key: 'by-me', label: `By ${myName} (${byMe.length})` },
+        ] as { key: AssignedFilter; label: string }[]).map(({ key, label }) => (
+          <button
+            key={key}
+            onClick={() => setFilter(key)}
+            className={`px-3 py-1.5 rounded-xl text-xs font-display font-700 transition-colors whitespace-nowrap ${
+              filter === key
+                ? 'bg-sage-400 text-white'
+                : 'bg-cream-200 text-warm-gray hover:bg-cream-300'
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {/* Empty state */}
       {!hasAny && (
         <div className="card text-center py-10">
           <ClipboardList className="w-12 h-12 mx-auto mb-3 text-warm-gray opacity-30" />
           <p className="font-display font-700 text-gray-700 mb-1">No assigned tasks</p>
           <p className="text-xs text-warm-gray font-display">
-            Tap the person-plus icon on any pending task to assign it to {scores[otherPlayer].displayName}.
+            Tap the person-plus icon on any pending task to assign it to yourself or {otherName}.
           </p>
         </div>
       )}
 
-      {/* Assigned to me */}
-      {assignedToMe.length > 0 && (
-        <div className="card border-2 border-rose-light">
-          <div className="flex items-center gap-2 mb-1">
-            <span className="text-xl">📌</span>
-            <h3 className="font-display font-700 text-gray-800">
-              Assigned to {scores[activePlayer].displayName}
-            </h3>
-            <span className="text-xs font-display font-700 px-2 py-0.5 rounded-full bg-rose-light text-rose-medium">
-              {assignedToMe.length}
-            </span>
-          </div>
-          <p className="text-xs text-warm-gray font-display mb-3">
-            From {scores[otherPlayer].displayName} — complete these to earn points!
-          </p>
-          <div className="space-y-2">
-            {assignedToMe.map(task => (
-              editId === task.id ? (
-                <TaskForm
-                  key={task.id}
-                  initial={task}
-                  onSave={data => { updateTask(task.id, data); setEditId(null); }}
-                  onCancel={() => setEditId(null)}
-                />
-              ) : (
-                <AssignedTaskCard
-                  key={task.id}
-                  task={task}
-                  onEdit={() => setEditId(task.id)}
-                />
-              )
-            ))}
-          </div>
+      {hasAny && displayed.length === 0 && (
+        <div className="card text-center py-8">
+          <p className="font-display font-700 text-gray-500">Nothing here</p>
+          <p className="text-xs text-warm-gray font-display mt-1">Switch filter to see tasks</p>
         </div>
       )}
 
-      {/* Assigned by me */}
-      {assignedByMe.length > 0 && (
-        <div className="card border-2 border-sage-200">
-          <button
-            onClick={() => setShowByMe(v => !v)}
-            className="w-full flex items-center justify-between"
-          >
-            <div className="flex items-center gap-2">
-              <span className="text-xl">📋</span>
-              <h3 className="font-display font-700 text-gray-800">
-                Assigned by {scores[activePlayer].displayName}
-              </h3>
-              <span className="text-xs font-display font-700 px-2 py-0.5 rounded-full bg-sage-100 text-sage-600">
-                {assignedByMe.length}
-              </span>
-            </div>
-            {showByMe ? <ChevronUp className="w-4 h-4 text-warm-gray" /> : <ChevronDown className="w-4 h-4 text-warm-gray" />}
-          </button>
-          <p className="text-xs text-warm-gray font-display mt-1">
-            Tasks you've handed to {scores[otherPlayer].displayName}
-          </p>
-          {showByMe && (
-            <div className="mt-3 space-y-2">
-              {assignedByMe.map(task => (
-                editId === task.id ? (
-                  <TaskForm
-                    key={task.id}
-                    initial={task}
-                    onSave={data => { updateTask(task.id, data); setEditId(null); }}
-                    onCancel={() => setEditId(null)}
-                  />
-                ) : (
-                  <AssignedTaskCard
-                    key={task.id}
-                    task={task}
-                    onEdit={() => setEditId(task.id)}
-                  />
-                )
-              ))}
-            </div>
-          )}
+      {/* Task list */}
+      {displayed.length > 0 && (
+        <div className="space-y-2">
+          {displayed.map(task => {
+            const isToMe = task.claimedBy === activePlayer;
+            const fromLabel = isToMe && task.assignedBy
+              ? `📌 Assigned to ${myName} by ${otherName}`
+              : isToMe
+              ? `🤚 Claimed by ${myName}`
+              : `📋 Assigned by ${myName} → ${otherName}`;
+            return (
+              <div key={task.id}>
+                {filter === 'all' && (
+                  <p className={`text-[10px] font-display font-700 mb-1 px-1 ${isToMe ? 'text-rose-medium' : 'text-sage-500'}`}>
+                    {fromLabel}
+                  </p>
+                )}
+                {renderCard(task)}
+              </div>
+            );
+          })}
         </div>
       )}
     </div>
