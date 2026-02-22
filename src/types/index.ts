@@ -13,6 +13,7 @@ export interface Task {
   points: PointTier;
   completedBy?: Player;
   claimedBy?: Player;
+  assignedBy?: Player;
   completedAt?: string;
 }
 
@@ -74,3 +75,4 @@ export interface Toast {
 }
 
 export type NavTab = 'dashboard' | 'tasks' | 'shopping' | 'goals';
+export type ItemType = 'task' | 'shopping' | 'goal';

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useStore } from '../store/useStore';
 import type { ShoppingItem, PointTier } from '../types';
 import PointsBadge from '../components/PointsBadge';
-import { Plus, Pencil, Trash2, Check, ShoppingCart, RotateCcw } from 'lucide-react';
+import { Plus, Pencil, Trash2, Check, ShoppingCart, RotateCcw, ArrowRightLeft } from 'lucide-react';
 
 type Filter = 'all' | 'need' | 'purchased';
 
@@ -84,8 +84,9 @@ interface ShoppingCardProps {
 }
 
 function ShoppingCard({ item, onEdit }: ShoppingCardProps) {
-  const { purchaseItem, unpurchaseItem, deleteShoppingItem, scores } = useStore();
+  const { purchaseItem, unpurchaseItem, deleteShoppingItem, convertShoppingToTask, convertShoppingToGoal, scores } = useStore();
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [showMove, setShowMove] = useState(false);
   const isPurchased = item.status === 'Purchased';
 
   return (
@@ -126,6 +127,34 @@ function ShoppingCard({ item, onEdit }: ShoppingCardProps) {
           >
             <RotateCcw className="w-3.5 h-3.5" />
           </button>
+        )}
+        {/* Move to... */}
+        {!isPurchased && (
+          <div className="relative">
+            <button
+              onClick={() => setShowMove(v => !v)}
+              title="Move to..."
+              className="w-8 h-8 rounded-xl bg-cream-100 text-warm-gray hover:bg-cream-200 flex items-center justify-center"
+            >
+              <ArrowRightLeft className="w-3.5 h-3.5" />
+            </button>
+            {showMove && (
+              <div className="absolute right-0 top-9 z-20 bg-white rounded-2xl shadow-md border border-cream-200 min-w-[140px] overflow-hidden">
+                <button
+                  onClick={() => { convertShoppingToTask(item.id); setShowMove(false); }}
+                  className="w-full text-left px-4 py-2.5 text-xs font-display font-600 text-gray-700 hover:bg-cream-100"
+                >
+                  ✅ Move to Tasks
+                </button>
+                <button
+                  onClick={() => { convertShoppingToGoal(item.id); setShowMove(false); }}
+                  className="w-full text-left px-4 py-2.5 text-xs font-display font-600 text-gray-700 hover:bg-cream-100"
+                >
+                  🎯 Move to Goals
+                </button>
+              </div>
+            )}
+          </div>
         )}
         <button
           onClick={onEdit}

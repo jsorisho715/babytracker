@@ -11,9 +11,13 @@ CREATE TABLE IF NOT EXISTS tasks (
   completed_by TEXT,
   claimed_by TEXT,
   completed_at TEXT,
+  assigned_by TEXT,
   created_at TIMESTAMP DEFAULT NOW(),
   updated_at TIMESTAMP DEFAULT NOW()
 );
+
+-- Migration: run this if the table already exists
+-- ALTER TABLE tasks ADD COLUMN IF NOT EXISTS assigned_by TEXT;
 
 -- Create shopping_items table
 CREATE TABLE IF NOT EXISTS shopping_items (

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useStore } from '../store/useStore';
 import type { Goal } from '../types';
-import { Plus, Pencil, Trash2, Check, Target } from 'lucide-react';
+import { Plus, Pencil, Trash2, Check, Target, ArrowRightLeft } from 'lucide-react';
 
 interface GoalFormProps {
   initial?: Partial<Goal>;
@@ -80,8 +80,9 @@ interface GoalCardProps {
 }
 
 function GoalCard({ goal, onEdit }: GoalCardProps) {
-  const { completeGoal, deleteGoal, scores } = useStore();
+  const { completeGoal, deleteGoal, convertGoalToTask, convertGoalToShopping, scores } = useStore();
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [showMove, setShowMove] = useState(false);
 
   const formatDate = (d?: string) => {
     if (!d) return null;
@@ -120,6 +121,34 @@ function GoalCard({ goal, onEdit }: GoalCardProps) {
       </div>
 
       <div className="flex items-center gap-1 flex-shrink-0">
+        {/* Move to... */}
+        {!goal.completed && (
+          <div className="relative">
+            <button
+              onClick={() => setShowMove(v => !v)}
+              title="Move to..."
+              className="w-8 h-8 rounded-xl bg-cream-100 text-warm-gray hover:bg-cream-200 flex items-center justify-center"
+            >
+              <ArrowRightLeft className="w-3.5 h-3.5" />
+            </button>
+            {showMove && (
+              <div className="absolute right-0 top-9 z-20 bg-white rounded-2xl shadow-md border border-cream-200 min-w-[150px] overflow-hidden">
+                <button
+                  onClick={() => { convertGoalToTask(goal.id); setShowMove(false); }}
+                  className="w-full text-left px-4 py-2.5 text-xs font-display font-600 text-gray-700 hover:bg-cream-100"
+                >
+                  ✅ Move to Tasks
+                </button>
+                <button
+                  onClick={() => { convertGoalToShopping(goal.id); setShowMove(false); }}
+                  className="w-full text-left px-4 py-2.5 text-xs font-display font-600 text-gray-700 hover:bg-cream-100"
+                >
+                  🛒 Move to Shopping
+                </button>
+              </div>
+            )}
+          </div>
+        )}
         <button
           onClick={onEdit}
           className="w-8 h-8 rounded-xl bg-cream-100 text-warm-gray hover:bg-sage-100 hover:text-sage-500 flex items-center justify-center"
