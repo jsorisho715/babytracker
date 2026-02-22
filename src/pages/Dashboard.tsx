@@ -55,9 +55,9 @@ function PlayerCard({ player }: { player: Player }) {
         </div>
       )}
 
-      {score.badges.length > 0 && (
+      {(score.badges ?? []).length > 0 && (
         <div className="flex flex-wrap gap-1 mt-2">
-          {score.badges.slice(0, 4).map(b => (
+          {(score.badges ?? []).slice(0, 4).map(b => (
             <span key={b.id} title={b.name} className="text-base">{b.emoji}</span>
           ))}
         </div>
@@ -243,23 +243,23 @@ export default function Dashboard() {
           <CategoryProgress />
 
           {/* All badges */}
-          {(scores.johnathan.badges.length > 0 || scores.jordyn.badges.length > 0) && (
+          {((scores.johnathan.badges ?? []).length > 0 || (scores.jordyn.badges ?? []).length > 0) && (
             <div className="card">
               <div className="flex items-center gap-2 mb-3">
                 <Star className="w-5 h-5 text-yellow-500" />
                 <h3 className="font-display font-700 text-gray-800">Badges Earned</h3>
               </div>
               <div className="grid grid-cols-2 gap-2">
-                {['johnathan' as Player, 'jordyn' as Player].map(p => (
+                {(['johnathan', 'jordyn'] as Player[]).map(p => (
                   <div key={p}>
                     <p className={`text-xs font-display font-700 mb-1 ${p === 'johnathan' ? 'text-sage-500' : 'text-rose-medium'}`}>
                       {scores[p].displayName}
                     </p>
-                    {scores[p].badges.length === 0 ? (
+                    {(scores[p].badges ?? []).length === 0 ? (
                       <p className="text-xs text-warm-gray">No badges yet</p>
                     ) : (
                       <div className="flex flex-wrap gap-1">
-                        {scores[p].badges.map(b => (
+                        {(scores[p].badges ?? []).map(b => (
                           <span key={b.id} title={b.name} className="text-xl">{b.emoji}</span>
                         ))}
                       </div>

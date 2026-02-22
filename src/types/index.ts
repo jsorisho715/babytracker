@@ -74,5 +74,5 @@ export interface Toast {
   canUndo?: boolean;
 }
 
-export type NavTab = 'dashboard' | 'tasks' | 'shopping' | 'goals';
+export type NavTab = 'dashboard' | 'tasks' | 'shopping' | 'goals' | 'assigned';
 export type ItemType = 'task' | 'shopping' | 'goal';

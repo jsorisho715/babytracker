@@ -102,6 +102,7 @@ interface AppState {
   deleteTask: (id: string) => void;
   claimTask: (id: string) => void;
   assignTask: (taskId: string, assignTo: Player) => void;
+  unassignTask: (taskId: string) => void;
   completeTask: (id: string) => void;
   uncompleteTask: (id: string) => void;
 
@@ -186,9 +187,20 @@ export const useStore = create<AppState>()(
               const goals = goalsRes.data || [];
               const playerScores = scoresRes.data || [];
               
+              const mapScore = (raw: any, defaultVal: PlayerScore): PlayerScore => ({
+                ...defaultVal,
+                ...raw,
+                totalPoints: raw?.total_points ?? defaultVal.totalPoints,
+                tasksCompleted: raw?.tasks_completed ?? defaultVal.tasksCompleted,
+                streakDays: raw?.streak_days ?? defaultVal.streakDays,
+                lastCompletedDate: raw?.last_completed_date ?? defaultVal.lastCompletedDate,
+                displayName: raw?.display_name ?? defaultVal.displayName,
+                badges: defaultVal.badges,
+              });
+
               const scores: Record<Player, PlayerScore> = {
-                johnathan: playerScores.find(s => s.player === 'johnathan') || DEFAULT_SCORES.johnathan,
-                jordyn: playerScores.find(s => s.player === 'jordyn') || DEFAULT_SCORES.jordyn,
+                johnathan: mapScore(playerScores.find(s => s.player === 'johnathan'), DEFAULT_SCORES.johnathan),
+                jordyn: mapScore(playerScores.find(s => s.player === 'jordyn'), DEFAULT_SCORES.jordyn),
               };
 
               set({ tasks, shopping, goals, scores, isLoaded: true });
@@ -329,11 +341,16 @@ export const useStore = create<AppState>()(
 
       assignTask: (taskId, assignTo) => {
         const { activePlayer } = get();
-        if (assignTo === activePlayer) return;
+        const isSelf = assignTo === activePlayer;
         set(s => ({
           tasks: s.tasks.map(t =>
             t.id === taskId && t.status === 'pending'
-              ? { ...t, status: 'claimed', claimedBy: assignTo, assignedBy: activePlayer }
+              ? {
+                  ...t,
+                  status: 'claimed',
+                  claimedBy: assignTo,
+                  assignedBy: isSelf ? undefined : activePlayer,
+                }
               : t
           ),
         }));
@@ -343,13 +360,37 @@ export const useStore = create<AppState>()(
               await supabase.from('tasks').update({
                 status: 'claimed',
                 claimed_by: assignTo,
-                assigned_by: activePlayer,
+                assigned_by: isSelf ? null : activePlayer,
               }).eq('id', taskId);
             } catch (err: any) { console.error('Supabase sync error:', err); }
           })();
         }
-        const assigneeName = assignTo === 'johnathan' ? 'Johnathan' : 'Jordyn';
+        const assigneeName = isSelf ? 'yourself' : assignTo === 'johnathan' ? 'Johnathan' : 'Jordyn';
         get().addToast({ message: `Task assigned to ${assigneeName}!`, type: 'info' });
+      },
+
+      unassignTask: (taskId) => {
+        const task = get().tasks.find(t => t.id === taskId);
+        if (!task || task.status === 'pending') return;
+        set(s => ({
+          tasks: s.tasks.map(t =>
+            t.id === taskId
+              ? { ...t, status: 'pending' as const, claimedBy: undefined, assignedBy: undefined }
+              : t
+          ),
+        }));
+        if (SUPABASE_ENABLED) {
+          (async () => {
+            try {
+              await supabase.from('tasks').update({
+                status: 'pending',
+                claimed_by: null,
+                assigned_by: null,
+              }).eq('id', taskId);
+            } catch (err: any) { console.error('Supabase sync error:', err); }
+          })();
+        }
+        get().addToast({ message: 'Task unassigned', type: 'info' });
       },
 
       completeTask: (id) => {
@@ -769,6 +810,20 @@ export const useStore = create<AppState>()(
         isLoaded: state.isLoaded,
         previousMilestone: state.previousMilestone,
       }),
+      merge: (persisted: any, current) => {
+        const ensureBadges = (scores: any) => {
+          if (!scores) return current.scores;
+          return {
+            johnathan: { ...current.scores.johnathan, ...scores.johnathan, badges: scores.johnathan?.badges ?? [] },
+            jordyn: { ...current.scores.jordyn, ...scores.jordyn, badges: scores.jordyn?.badges ?? [] },
+          };
+        };
+        return {
+          ...current,
+          ...(persisted as any),
+          scores: ensureBadges((persisted as any)?.scores),
+        };
+      },
     }
   )
 );

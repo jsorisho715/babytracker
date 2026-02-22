@@ -8,6 +8,7 @@ import Dashboard from './pages/Dashboard';
 import Tasks from './pages/Tasks';
 import Shopping from './pages/Shopping';
 import Goals from './pages/Goals';
+import Assigned from './pages/Assigned';
 import { Settings } from 'lucide-react';
 import { useState } from 'react';
 import SettingsModal from './components/SettingsModal';
@@ -23,6 +24,7 @@ function Header() {
     tasks: 'Checklist',
     shopping: 'Shopping',
     goals: 'Goals & Ideas',
+    assigned: 'Assigned Tasks',
   };
 
   return (
@@ -79,6 +81,7 @@ export default function App() {
         {activeTab === 'tasks' && <Tasks />}
         {activeTab === 'shopping' && <Shopping />}
         {activeTab === 'goals' && <Goals />}
+        {activeTab === 'assigned' && <Assigned />}
       </main>
       <BottomNav />
       <ToastContainer />

@@ -1,4 +1,4 @@
-import { LayoutDashboard, CheckSquare, ShoppingCart, Target } from 'lucide-react';
+import { LayoutDashboard, CheckSquare, ShoppingCart, Target, ClipboardList } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import type { NavTab } from '../types';
 
@@ -7,25 +7,34 @@ const NAV_ITEMS: { tab: NavTab; icon: React.ReactNode; label: string }[] = [
   { tab: 'tasks', icon: <CheckSquare className="w-5 h-5" />, label: 'Tasks' },
   { tab: 'shopping', icon: <ShoppingCart className="w-5 h-5" />, label: 'Shop' },
   { tab: 'goals', icon: <Target className="w-5 h-5" />, label: 'Goals' },
+  { tab: 'assigned', icon: <ClipboardList className="w-5 h-5" />, label: 'Assigned' },
 ];
 
 export default function BottomNav() {
-  const { activeTab, setActiveTab, tasks, shopping } = useStore();
+  const { activeTab, setActiveTab, tasks, shopping, activePlayer } = useStore();
 
+  const otherPlayer = activePlayer === 'johnathan' ? 'jordyn' : 'johnathan';
   const pendingTasks = tasks.filter(t => t.status !== 'done').length;
   const pendingShopping = shopping.filter(s => s.status === 'Need to Purchase').length;
+  const assignedToMe = tasks.filter(
+    t => t.claimedBy === activePlayer && t.assignedBy === otherPlayer && t.status !== 'done'
+  ).length;
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-cream-200 pb-safe z-40">
       <div className="flex items-center justify-around max-w-lg mx-auto">
         {NAV_ITEMS.map(({ tab, icon, label }) => {
           const isActive = activeTab === tab;
-          const badge = tab === 'tasks' ? pendingTasks : tab === 'shopping' ? pendingShopping : 0;
+          const badge =
+            tab === 'tasks' ? pendingTasks :
+            tab === 'shopping' ? pendingShopping :
+            tab === 'assigned' ? assignedToMe :
+            0;
           return (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
-              className={`flex flex-col items-center gap-1 py-3 px-4 relative transition-colors duration-150 ${
+              className={`flex flex-col items-center gap-1 py-3 px-3 relative transition-colors duration-150 ${
                 isActive ? 'text-sage-500' : 'text-warm-gray'
               }`}
             >

@@ -3,7 +3,7 @@ import { useStore } from '../store/useStore';
 import type { Task, PointTier, Player } from '../types';
 import { CATEGORY_EMOJIS, TASK_CATEGORIES } from '../data/seedData';
 import PointsBadge from '../components/PointsBadge';
-import { Plus, Pencil, Trash2, Check, ChevronDown, ChevronUp, Flag, UserPlus, ArrowRightLeft } from 'lucide-react';
+import { Plus, Pencil, Trash2, Check, ChevronDown, ChevronUp, Flag, UserPlus, ArrowRightLeft, UserX } from 'lucide-react';
 
 type Filter = 'all' | 'pending' | 'claimed' | 'done';
 
@@ -123,12 +123,13 @@ const PRIORITY_DOT: Record<string, string> = {
 
 function TaskCard({ task, onEdit }: TaskCardProps) {
   const {
-    activePlayer, claimTask, assignTask, completeTask, uncompleteTask,
+    activePlayer, claimTask, assignTask, unassignTask, completeTask, uncompleteTask,
     deleteTask, convertTaskToShopping, convertTaskToGoal, scores,
   } = useStore();
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [showNotes, setShowNotes] = useState(false);
   const [showMove, setShowMove] = useState(false);
+  const [showAssign, setShowAssign] = useState(false);
 
   const isDone = task.status === 'done';
   const isClaimed = task.status === 'claimed';
@@ -207,14 +208,43 @@ function TaskCard({ task, onEdit }: TaskCardProps) {
         </div>
 
         <div className="flex items-center gap-1 flex-shrink-0">
-          {/* Assign to other player (only when pending) */}
+          {/* Assign dropdown (only when pending) */}
           {!isDone && !isClaimed && (
+            <div className="relative">
+              <button
+                onClick={() => setShowAssign(v => !v)}
+                title="Assign to..."
+                className="w-8 h-8 rounded-xl bg-cream-100 text-warm-gray hover:bg-rose-50 hover:text-rose-medium flex items-center justify-center"
+              >
+                <UserPlus className="w-3.5 h-3.5" />
+              </button>
+              {showAssign && (
+                <div className="absolute right-0 top-9 z-20 bg-white rounded-2xl shadow-md border border-cream-200 min-w-[160px] overflow-hidden">
+                  <button
+                    onClick={() => { assignTask(task.id, activePlayer); setShowAssign(false); }}
+                    className="w-full text-left px-4 py-2.5 text-xs font-display font-600 text-gray-700 hover:bg-cream-100"
+                  >
+                    👤 Assign to me
+                  </button>
+                  <button
+                    onClick={() => { assignTask(task.id, otherPlayer); setShowAssign(false); }}
+                    className="w-full text-left px-4 py-2.5 text-xs font-display font-600 text-gray-700 hover:bg-cream-100"
+                  >
+                    👥 Assign to {otherName}
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Unassign (when task is claimed, by assignment or self) */}
+          {!isDone && isClaimed && (
             <button
-              onClick={() => assignTask(task.id, otherPlayer)}
-              title={`Assign to ${otherName}`}
-              className="w-8 h-8 rounded-xl bg-cream-100 text-warm-gray hover:bg-rose-50 hover:text-rose-medium flex items-center justify-center"
+              onClick={() => unassignTask(task.id)}
+              title="Unassign"
+              className="w-8 h-8 rounded-xl bg-cream-100 text-warm-gray hover:bg-red-50 hover:text-red-400 flex items-center justify-center"
             >
-              <UserPlus className="w-3.5 h-3.5" />
+              <UserX className="w-3.5 h-3.5" />
             </button>
           )}
 
@@ -334,72 +364,14 @@ function CategoryGroup({ category, tasks, defaultOpen, onEdit, editId, onCancelE
   );
 }
 
-function AssignedSection({ tasks, editId, onEdit, onCancelEdit }: {
-  tasks: Task[];
-  editId: string | null;
-  onEdit: (id: string) => void;
-  onCancelEdit: () => void;
-}) {
-  const { updateTask, scores, activePlayer } = useStore();
-  const [open, setOpen] = useState(true);
-
-  const assignerName = tasks.length > 0 && tasks[0].assignedBy
-    ? scores[tasks[0].assignedBy].displayName
-    : 'them';
-
-  return (
-    <div className="card border-2 border-rose-light">
-      <button onClick={() => setOpen(v => !v)} className="w-full flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <span className="text-xl">📌</span>
-          <h3 className="font-display font-700 text-gray-800">
-            Assigned to {scores[activePlayer].displayName}
-          </h3>
-          <span className="text-xs font-display font-700 px-2 py-0.5 rounded-full bg-rose-light text-rose-medium">
-            {tasks.length}
-          </span>
-        </div>
-        {open ? <ChevronUp className="w-4 h-4 text-warm-gray" /> : <ChevronDown className="w-4 h-4 text-warm-gray" />}
-      </button>
-      {tasks.length > 0 && (
-        <p className="text-xs text-warm-gray mt-1 font-display">
-          From {assignerName} — complete these to earn points!
-        </p>
-      )}
-      {open && (
-        <div className="mt-3 space-y-2">
-          {tasks.map(task => (
-            editId === task.id ? (
-              <TaskForm
-                key={task.id}
-                initial={task}
-                onSave={data => { updateTask(task.id, data); onCancelEdit(); }}
-                onCancel={onCancelEdit}
-              />
-            ) : (
-              <TaskCard key={task.id} task={task} onEdit={() => onEdit(task.id)} />
-            )
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
 export default function Tasks() {
-  const { tasks, addTask, scores, activePlayer } = useStore();
+  const { tasks, addTask, scores } = useStore();
   const [filter, setFilter] = useState<Filter>('all');
   const [showAdd, setShowAdd] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
 
-  const assignedToMe = tasks.filter(
-    t => t.claimedBy === activePlayer && t.assignedBy && t.assignedBy !== activePlayer && t.status !== 'done'
-  );
-
   const filtered = tasks.filter(t => {
-    const isAssignedToMe = t.claimedBy === activePlayer && t.assignedBy && t.assignedBy !== activePlayer && t.status !== 'done';
-    if (isAssignedToMe) return false; // shown separately
     const statusMatch = filter === 'all' || t.status === filter;
     const catMatch = categoryFilter === 'all' || t.category === categoryFilter;
     return statusMatch && catMatch;
@@ -413,7 +385,7 @@ export default function Tasks() {
   }, {} as Record<string, Task[]>);
 
   const counts = {
-    all: tasks.filter(t => !(t.claimedBy === activePlayer && t.assignedBy && t.assignedBy !== activePlayer && t.status !== 'done')).length,
+    all: tasks.length,
     pending: tasks.filter(t => t.status === 'pending').length,
     claimed: tasks.filter(t => t.status === 'claimed').length,
     done: tasks.filter(t => t.status === 'done').length,
@@ -435,16 +407,6 @@ export default function Tasks() {
           <p className="text-xs text-warm-gray font-display font-600">{scores.jordyn.displayName} tasks</p>
         </div>
       </div>
-
-      {/* Assigned to you section */}
-      {assignedToMe.length > 0 && (
-        <AssignedSection
-          tasks={assignedToMe}
-          editId={editId}
-          onEdit={(id) => { setEditId(id); setShowAdd(false); }}
-          onCancelEdit={() => setEditId(null)}
-        />
-      )}
 
       {/* Status filter + Add */}
       <div className="flex items-center justify-between gap-2">
