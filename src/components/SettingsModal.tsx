@@ -7,11 +7,13 @@ interface Props {
 }
 
 export default function SettingsModal({ onClose }: Props) {
-  const { settings, updateSettings, loadSeedData, resetToSeed } = useStore();
+  const { settings, updateSettings, loadSeedData, resetToSeed, resetScores } = useStore();
   const [babyName, setBabyName] = useState(settings.babyName);
   const [dueDate, setDueDate] = useState(settings.dueDate ?? '');
   const [confirmReset, setConfirmReset] = useState(false);
+  const [confirmResetScores, setConfirmResetScores] = useState(false);
   const [resetting, setResetting] = useState(false);
+  const [resettingScores, setResettingScores] = useState(false);
 
   const handleSave = () => {
     updateSettings({ babyName: babyName.trim() || 'Luca', dueDate: dueDate || undefined });
@@ -28,6 +30,14 @@ export default function SettingsModal({ onClose }: Props) {
 
   const handleReimport = () => {
     loadSeedData(true);
+    onClose();
+  };
+
+  const handleResetScores = async () => {
+    setResettingScores(true);
+    await resetScores();
+    setResettingScores(false);
+    setConfirmResetScores(false);
     onClose();
   };
 
@@ -78,6 +88,28 @@ export default function SettingsModal({ onClose }: Props) {
           >
             Re-import checklist from Excel data
           </button>
+          {!confirmResetScores ? (
+            <button
+              onClick={() => setConfirmResetScores(true)}
+              className="w-full text-left text-sm font-display font-600 text-amber-600 bg-amber-50 hover:bg-amber-100 rounded-xl px-4 py-2.5 transition-colors"
+            >
+              Reset points only
+            </button>
+          ) : (
+            <div className="bg-amber-50 rounded-xl px-4 py-3 space-y-2">
+              <p className="text-xs text-amber-800 font-display font-600">
+                Zero all player points and task counts. Tasks, shopping, and goals stay unchanged.
+              </p>
+              <div className="flex gap-2">
+                <button onClick={handleResetScores} disabled={resettingScores} className="flex-1 bg-amber-500 text-white font-display font-700 rounded-xl py-2 text-sm disabled:opacity-60">
+                  {resettingScores ? 'Resetting…' : 'Yes, Reset Points'}
+                </button>
+                <button onClick={() => setConfirmResetScores(false)} className="flex-1 bg-cream-100 text-warm-gray font-display font-700 rounded-xl py-2 text-sm">
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
           {!confirmReset ? (
             <button
               onClick={() => setConfirmReset(true)}

@@ -103,6 +103,7 @@ interface AppState {
   loadSeedData: (force?: boolean) => Promise<void>;
   syncToSupabase: () => Promise<void>;
   resetToSeed: () => Promise<void>;
+  resetScores: () => Promise<void>;
   addTask: (task: Omit<Task, 'id'>) => void;
   updateTask: (id: string, updates: Partial<Task>) => void;
   deleteTask: (id: string) => void;
@@ -353,6 +354,31 @@ export const useStore = create<AppState>()(
         }
 
         get().addToast({ message: 'All data reset to fresh start', type: 'info' });
+      },
+
+      resetScores: async () => {
+        set({ scores: DEFAULT_SCORES });
+        if (SUPABASE_ENABLED) {
+          try {
+            await Promise.all([
+              supabase.from('player_scores').update({
+                total_points: 0,
+                tasks_completed: 0,
+                streak_days: 0,
+                last_completed_date: null,
+              }).eq('player', 'johnathan'),
+              supabase.from('player_scores').update({
+                total_points: 0,
+                tasks_completed: 0,
+                streak_days: 0,
+                last_completed_date: null,
+              }).eq('player', 'jordyn'),
+            ]);
+          } catch (err) {
+            console.error('Supabase resetScores:', err);
+          }
+        }
+        get().addToast({ message: 'Points reset to zero', type: 'info' });
       },
 
       addTask: (taskData) => {
