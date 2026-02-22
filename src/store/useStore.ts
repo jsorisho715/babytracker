@@ -95,7 +95,7 @@ interface AppState {
   previousMilestone: number;
 
   // Actions - tasks
-  loadSeedData: (force?: boolean) => void;
+  loadSeedData: (force?: boolean) => Promise<void>;
   syncToSupabase: () => Promise<void>;
   addTask: (task: Omit<Task, 'id'>) => void;
   updateTask: (id: string, updates: Partial<Task>) => void;
@@ -161,11 +161,11 @@ export const useStore = create<AppState>()(
 
       loadSeedData: (force = false) => {
         const { isLoaded } = get();
-        if (isLoaded && !force) return;
+        if (isLoaded && !force) return Promise.resolve();
         
         // If Supabase is enabled, try to load from there
         if (SUPABASE_ENABLED) {
-          Promise.all([
+          return Promise.all([
             supabase.from('tasks').select('*'),
             supabase.from('shopping_items').select('*'),
             supabase.from('goals').select('*'),
@@ -224,10 +224,11 @@ export const useStore = create<AppState>()(
           }).catch(() => {
             // Fallback to seeds if Supabase fails
             set({ tasks: seedTasks, shopping: seedShoppingItems, goals: seedGoals, isLoaded: true });
-          });
+          }) as Promise<void>;
         } else {
           // LocalStorage only
           set({ tasks: seedTasks, shopping: seedShoppingItems, goals: seedGoals, isLoaded: true });
+          return Promise.resolve();
         }
       },
 
@@ -872,7 +873,6 @@ export const useStore = create<AppState>()(
         scores: state.scores,
         settings: state.settings,
         activePlayer: state.activePlayer,
-        isLoaded: state.isLoaded,
         previousMilestone: state.previousMilestone,
       }),
       merge: (persisted: any, current) => {

@@ -4,6 +4,7 @@ import { supabase } from './lib/supabase';
 import BottomNav from './components/BottomNav';
 import PlayerToggle from './components/PlayerToggle';
 import ToastContainer from './components/ToastContainer';
+import PullToRefresh from './components/PullToRefresh';
 import Dashboard from './pages/Dashboard';
 import Tasks from './pages/Tasks';
 import Shopping from './pages/Shopping';
@@ -90,6 +91,18 @@ export default function App() {
     loadSeedData();
   }, [isLoaded, loadSeedData]);
 
+  // Refresh from Supabase when app becomes visible (e.g. user switches back to tab)
+  useEffect(() => {
+    if (!SUPABASE_ENABLED) return;
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        loadSeedData(true);
+      }
+    };
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', onVisibilityChange);
+  }, [loadSeedData]);
+
   // Set up real-time listeners for Supabase
   useEffect(() => {
     if (!SUPABASE_ENABLED) return;
@@ -117,16 +130,28 @@ export default function App() {
     };
   }, [loadSeedData, updateSettingsFromSync]);
 
+  const handleRefresh = () => loadSeedData(true);
+
+  const mainContent = (
+    <main className="max-w-lg mx-auto px-4 pt-4 pb-28">
+      {activeTab === 'dashboard' && <Dashboard />}
+      {activeTab === 'tasks' && <Tasks />}
+      {activeTab === 'shopping' && <Shopping />}
+      {activeTab === 'goals' && <Goals />}
+      {activeTab === 'assigned' && <Assigned />}
+    </main>
+  );
+
   return (
-    <div className="min-h-screen bg-cream-100">
-      <Header />
-      <main className="max-w-lg mx-auto px-4 pt-4 pb-28">
-        {activeTab === 'dashboard' && <Dashboard />}
-        {activeTab === 'tasks' && <Tasks />}
-        {activeTab === 'shopping' && <Shopping />}
-        {activeTab === 'goals' && <Goals />}
-        {activeTab === 'assigned' && <Assigned />}
-      </main>
+    <div className="flex flex-col bg-cream-100 h-screen max-h-dvh overflow-hidden">
+      <div className="flex-shrink-0">
+        <Header />
+      </div>
+      {SUPABASE_ENABLED ? (
+        <PullToRefresh onRefresh={handleRefresh}>{mainContent}</PullToRefresh>
+      ) : (
+        <div className="flex-1 overflow-y-auto">{mainContent}</div>
+      )}
       <BottomNav />
       <ToastContainer />
     </div>
