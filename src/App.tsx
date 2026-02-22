@@ -6,6 +6,7 @@ import BottomNav from './components/BottomNav';
 import PlayerToggle from './components/PlayerToggle';
 import ToastContainer from './components/ToastContainer';
 import PullToRefresh from './components/PullToRefresh';
+import PinGate from './components/PinGate';
 import Dashboard from './pages/Dashboard';
 import Tasks from './pages/Tasks';
 import Shopping from './pages/Shopping';
@@ -150,17 +151,19 @@ export default function App() {
   );
 
   return (
-    <div className="flex flex-col bg-cream-100 h-screen max-h-dvh overflow-hidden">
-      <div className="flex-shrink-0">
-        <Header />
+    <PinGate>
+      <div className="flex flex-col bg-cream-100 h-screen max-h-dvh overflow-hidden">
+        <div className="flex-shrink-0">
+          <Header />
+        </div>
+        {SUPABASE_ENABLED ? (
+          <PullToRefresh onRefresh={handleRefresh}>{mainContent}</PullToRefresh>
+        ) : (
+          <div className="flex-1 overflow-y-auto">{mainContent}</div>
+        )}
+        <BottomNav />
+        <ToastContainer />
       </div>
-      {SUPABASE_ENABLED ? (
-        <PullToRefresh onRefresh={handleRefresh}>{mainContent}</PullToRefresh>
-      ) : (
-        <div className="flex-1 overflow-y-auto">{mainContent}</div>
-      )}
-      <BottomNav />
-      <ToastContainer />
-    </div>
+    </PinGate>
   );
 }
