@@ -194,7 +194,7 @@ function DailySection() {
 
   const dailyTasks = tasks.filter(t =>
     t.isDaily &&
-    (t.claimedBy === activePlayer || t.status === 'pending') &&
+    (t.claimedBy === activePlayer || t.status === 'pending' || t.assignedToBoth) &&
     (t.status !== 'done' || !t.completedAt || t.completedAt.slice(0, 10) < today)
   );
 
@@ -239,7 +239,9 @@ function DailySection() {
       <div className="space-y-2">
         {dailyTasks.map(task => {
           const isDone = task.status === 'done';
-          const isClaimed = task.status === 'claimed' && task.claimedBy === activePlayer;
+          const isTeam = !!task.assignedToBoth;
+          const isClaimedByMe = task.status === 'claimed' && task.claimedBy === activePlayer;
+          const canComplete = isClaimedByMe || isTeam;
           return (
             <div key={task.id} className={`flex items-center gap-3 p-2.5 rounded-2xl ${isDone ? 'bg-sage-50 opacity-70' : 'bg-cream-100'}`}>
               <div className="flex-1 min-w-0">
@@ -251,20 +253,20 @@ function DailySection() {
                 onClick={() => {
                   if (isDone) return;
                   if (task.status === 'pending') claimTask(task.id);
-                  else if (isClaimed) completeTask(task.id);
+                  else if (canComplete) completeTask(task.id);
                 }}
-                disabled={isDone || (task.status === 'claimed' && task.claimedBy !== activePlayer)}
+                disabled={isDone || (!canComplete && task.status === 'claimed')}
                 className={`text-xs font-display font-700 px-3 py-1.5 rounded-xl transition-all whitespace-nowrap ${
                   isDone
                     ? 'bg-sage-200 text-sage-500 cursor-default'
-                    : isClaimed
+                    : canComplete
                     ? 'bg-sage-400 text-white hover:bg-sage-500'
                     : task.status === 'pending'
                     ? 'bg-sage-100 text-sage-600 hover:bg-sage-200'
                     : 'bg-cream-200 text-warm-gray cursor-not-allowed'
                 }`}
               >
-                {isDone ? '✓ Done' : isClaimed ? 'Complete' : 'Claim'}
+                {isDone ? '✓ Done' : canComplete ? 'Complete' : 'Claim'}
               </button>
             </div>
           );

@@ -304,11 +304,13 @@ export const useStore = create<AppState>()(
       updateTask: (id, updates) => {
         set(s => {
           const tasks = s.tasks.map(t => t.id === id ? { ...t, ...updates } : t);
+          const updated = tasks.find(t => t.id === id);
           // If reverting to pending from done, deduct points
           const original = s.tasks.find(t => t.id === id);
+          let result: { tasks: typeof tasks; scores?: Record<Player, PlayerScore> } = { tasks };
           if (original?.status === 'done' && updates.status === 'pending' && original.completedBy) {
             const player = original.completedBy;
-            const scores = {
+            result.scores = {
               ...s.scores,
               [player]: {
                 ...s.scores[player],
@@ -316,9 +318,29 @@ export const useStore = create<AppState>()(
                 tasksCompleted: Math.max(0, s.scores[player].tasksCompleted - 1),
               },
             };
-            return { tasks, scores };
           }
-          return { tasks };
+          if (SUPABASE_ENABLED && updated) {
+            (async () => {
+              try {
+                await supabase.from('tasks').update({
+                  task: updated.task,
+                  category: updated.category,
+                  priority: updated.priority,
+                  timing: updated.timing,
+                  status: updated.status,
+                  notes: updated.notes ?? null,
+                  points: updated.points,
+                  completed_by: updated.completedBy ?? null,
+                  claimed_by: updated.claimedBy ?? null,
+                  assigned_by: updated.assignedBy ?? null,
+                  completed_at: updated.completedAt ?? null,
+                  is_daily: updated.isDaily ?? false,
+                  assigned_to_both: updated.assignedToBoth ?? false,
+                }).eq('id', id);
+              } catch (err: any) { console.error('Supabase updateTask:', err); }
+            })();
+          }
+          return result;
         });
       },
 
