@@ -4,6 +4,9 @@ import type {
   Task, ShoppingItem, Goal, Player, PlayerScore, AppSettings, Toast, NavTab, Badge
 } from '../types';
 import { seedTasks, seedShoppingItems, seedGoals, MILESTONE_MESSAGES } from '../data/seedData';
+import { supabase } from '../lib/supabase';
+
+const SUPABASE_ENABLED = !!import.meta.env.VITE_SUPABASE_URL;
 
 const DEFAULT_SCORES: Record<Player, PlayerScore> = {
   johnathan: {
@@ -93,6 +96,7 @@ interface AppState {
 
   // Actions - tasks
   loadSeedData: () => void;
+  syncToSupabase: () => Promise<void>;
   addTask: (task: Omit<Task, 'id'>) => void;
   updateTask: (id: string, updates: Partial<Task>) => void;
   deleteTask: (id: string) => void;
@@ -146,12 +150,103 @@ export const useStore = create<AppState>()(
       loadSeedData: () => {
         const { isLoaded } = get();
         if (isLoaded) return;
-        set({
-          tasks: seedTasks,
-          shopping: seedShoppingItems,
-          goals: seedGoals,
-          isLoaded: true,
-        });
+        
+        // If Supabase is enabled, try to load from there
+        if (SUPABASE_ENABLED) {
+          Promise.all([
+            supabase.from('tasks').select('*'),
+            supabase.from('shopping_items').select('*'),
+            supabase.from('goals').select('*'),
+            supabase.from('player_scores').select('*')
+          ]).then(([tasksRes, shoppingRes, goalsRes, scoresRes]) => {
+            if (tasksRes.data?.length) {
+              const tasks = tasksRes.data.map(t => ({
+                ...t,
+                points: t.points as any,
+                status: t.status as any
+              }));
+              const shopping = shoppingRes.data?.map(s => ({
+                ...s,
+                points: s.points as any,
+                status: s.status as any
+              })) || [];
+              const goals = goalsRes.data || [];
+              const playerScores = scoresRes.data || [];
+              
+              const scores: Record<Player, PlayerScore> = {
+                johnathan: playerScores.find(s => s.player === 'johnathan') || DEFAULT_SCORES.johnathan,
+                jordyn: playerScores.find(s => s.player === 'jordyn') || DEFAULT_SCORES.jordyn,
+              };
+
+              set({ tasks, shopping, goals, scores, isLoaded: true });
+            } else {
+              // No data in Supabase, load seeds and sync
+              set({ tasks: seedTasks, shopping: seedShoppingItems, goals: seedGoals, isLoaded: true });
+              get().syncToSupabase();
+            }
+          }).catch(() => {
+            // Fallback to seeds if Supabase fails
+            set({ tasks: seedTasks, shopping: seedShoppingItems, goals: seedGoals, isLoaded: true });
+          });
+        } else {
+          // LocalStorage only
+          set({ tasks: seedTasks, shopping: seedShoppingItems, goals: seedGoals, isLoaded: true });
+        }
+      },
+
+      syncToSupabase: async () => {
+        if (!SUPABASE_ENABLED) return;
+        const { tasks, shopping, goals, scores } = get();
+        
+        try {
+          // Upsert all data to Supabase
+          await Promise.all([
+            supabase.from('tasks').upsert(tasks.map(t => ({
+              id: t.id,
+              category: t.category,
+              task: t.task,
+              priority: t.priority,
+              timing: t.timing,
+              status: t.status,
+              notes: t.notes,
+              points: t.points,
+              completed_by: t.completedBy,
+              claimed_by: t.claimedBy,
+              completed_at: t.completedAt
+            })) as any),
+            supabase.from('shopping_items').upsert(shopping.map(s => ({
+              id: s.id,
+              name: s.name,
+              price: s.price,
+              stock: s.stock,
+              status: s.status,
+              notes: s.notes,
+              points: s.points,
+              purchased_by: s.purchasedBy,
+              purchased_at: s.purchasedAt
+            })) as any),
+            supabase.from('goals').upsert(goals.map(g => ({
+              id: g.id,
+              name: g.name,
+              start_date: g.startDate,
+              end_date: g.endDate,
+              notes: g.notes,
+              completed: g.completed,
+              completed_by: g.completedBy,
+              completed_at: g.completedAt
+            })) as any),
+            supabase.from('player_scores').upsert(Object.values(scores).map(s => ({
+              player: s.player,
+              display_name: s.displayName,
+              total_points: s.totalPoints,
+              tasks_completed: s.tasksCompleted,
+              streak_days: s.streakDays,
+              last_completed_date: s.lastCompletedDate
+            })) as any)
+          ]);
+        } catch (err) {
+          console.error('Failed to sync to Supabase:', err);
+        }
       },
 
       addTask: (taskData) => {
@@ -240,6 +335,25 @@ export const useStore = create<AppState>()(
 
         // Check milestones
         const nextMilestone = MILESTONE_MESSAGES.find(m => m.points > previousMilestone && m.points <= totalNow);
+
+        // Sync to Supabase if enabled
+        if (SUPABASE_ENABLED) {
+          supabase.from('tasks').update({ 
+            status: 'done', 
+            completed_by: activePlayer, 
+            completed_at: now,
+            claimed_by: null 
+          }).eq('id', id).then(() => {
+            supabase.from('player_scores').update({
+              total_points: newScore.totalPoints,
+              tasks_completed: newScore.tasksCompleted,
+              streak_days: newScore.streakDays,
+              last_completed_date: newScore.lastCompletedDate
+            }).eq('player', activePlayer).then(() => {
+              console.log('Synced to Supabase');
+            }).catch((err: any) => console.error('Supabase sync error:', err));
+          }).catch((err: any) => console.error('Supabase sync error:', err));
+        }
 
         set({
           tasks: updatedTasks,

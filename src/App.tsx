@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { useStore } from './store/useStore';
+import { supabase } from './lib/supabase';
 import BottomNav from './components/BottomNav';
 import PlayerToggle from './components/PlayerToggle';
 import ToastContainer from './components/ToastContainer';
@@ -10,6 +11,8 @@ import Goals from './pages/Goals';
 import { Settings } from 'lucide-react';
 import { useState } from 'react';
 import SettingsModal from './components/SettingsModal';
+
+const SUPABASE_ENABLED = !!import.meta.env.VITE_SUPABASE_URL;
 
 function Header() {
   const { activeTab, settings } = useStore();
@@ -47,11 +50,26 @@ export default function App() {
   const { activeTab, isLoaded, loadSeedData } = useStore();
 
   useEffect(() => {
-    if (!isLoaded) {
-      // Auto-load if this is first visit
-      // Users can also click "Load Checklist" on Dashboard
-    }
+    loadSeedData();
   }, [isLoaded, loadSeedData]);
+
+  // Set up real-time listeners for Supabase
+  useEffect(() => {
+    if (!SUPABASE_ENABLED) return;
+
+    const subscription = supabase
+      .channel('public:tasks')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks' }, (payload) => {
+        console.log('Tasks updated:', payload);
+        // Force refetch by clearing cache
+        loadSeedData();
+      })
+      .subscribe();
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [loadSeedData]);
 
   return (
     <div className="min-h-screen bg-cream-100">
