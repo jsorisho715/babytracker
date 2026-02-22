@@ -1,5 +1,3 @@
-import { useEffect, useRef } from 'react';
-import confetti from 'canvas-confetti';
 import { useStore } from '../store/useStore';
 import { CATEGORY_EMOJIS } from '../data/seedData';
 import type { Player, PointTier, Task } from '../types';
@@ -387,8 +385,6 @@ function DailySection() {
 
 export default function Dashboard() {
   const { tasks, shopping, scores, settings, isLoaded, loadSeedData } = useStore();
-  const celebratedRef = useRef(false);
-
   const totalDone = tasks.filter(t => t.status === 'done').length + shopping.filter(s => s.status === 'Purchased').length;
   const totalItems = tasks.length + shopping.length;
   const totalPoints = scores.johnathan.totalPoints + scores.jordyn.totalPoints;
@@ -397,13 +393,6 @@ export default function Dashboard() {
   const leader = scores.johnathan.totalPoints >= scores.jordyn.totalPoints ? scores.johnathan : scores.jordyn;
   const isNeckAndNeck = Math.abs(scores.johnathan.totalPoints - scores.jordyn.totalPoints) < 20;
 
-  useEffect(() => {
-    if (totalPoints > 0 && !celebratedRef.current && totalDone > 0 && totalDone % 10 === 0) {
-      confetti({ particleCount: 60, spread: 70, origin: { y: 0.6 } });
-      celebratedRef.current = true;
-      setTimeout(() => { celebratedRef.current = false; }, 2000);
-    }
-  }, [totalDone, totalPoints]);
 
   return (
     <div className="space-y-4">

@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import confetti from 'canvas-confetti';
 import { useStore } from './store/useStore';
 import { supabase } from './lib/supabase';
 import BottomNav from './components/BottomNav';
@@ -85,7 +86,12 @@ function Header() {
 }
 
 export default function App() {
-  const { activeTab, isLoaded, loadSeedData, updateSettingsFromSync } = useStore();
+  const { activeTab, isLoaded, loadSeedData, updateSettingsFromSync, confettiTrigger } = useStore();
+
+  useEffect(() => {
+    if (confettiTrigger === 0) return;
+    confetti({ particleCount: 120, spread: 80, origin: { y: 0.6 } });
+  }, [confettiTrigger]);
 
   useEffect(() => {
     loadSeedData();

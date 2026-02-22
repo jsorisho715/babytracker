@@ -136,6 +136,8 @@ interface AppState {
   convertGoalToShopping: (goalId: string) => void;
 
   // UI
+  confettiTrigger: number;
+  incrementConfetti: () => void;
   setActivePlayer: (player: Player) => void;
   setActiveTab: (tab: NavTab) => void;
   addToast: (toast: Omit<Toast, 'id'>) => void;
@@ -166,6 +168,9 @@ export const useStore = create<AppState>()(
       toasts: [],
       isLoaded: false,
       previousMilestone: 0,
+      confettiTrigger: 0,
+
+      incrementConfetti: () => set(s => ({ confettiTrigger: s.confettiTrigger + 1 })),
 
       loadSeedData: (force = false) => {
         const { isLoaded } = get();
@@ -661,6 +666,7 @@ export const useStore = create<AppState>()(
           }
           if (nextMilestone) get().addToast({ message: nextMilestone.message, type: 'info' });
           if (streakBonus > 0) get().addToast({ message: `🔥 3-day streak! +${streakBonus} bonus pts`, type: 'info' });
+          get().incrementConfetti();
           return;
         }
 
@@ -729,6 +735,7 @@ export const useStore = create<AppState>()(
         }
         if (nextMilestone) get().addToast({ message: nextMilestone.message, type: 'info' });
         if (streakBonus > 0) get().addToast({ message: `🔥 3-day streak! +${streakBonus} bonus pts`, type: 'info' });
+        get().incrementConfetti();
       },
 
       uncompleteTask: (id) => {
@@ -955,6 +962,7 @@ export const useStore = create<AppState>()(
             type: 'info',
           });
         }
+        get().incrementConfetti();
       },
 
       unpurchaseItem: (id) => {
