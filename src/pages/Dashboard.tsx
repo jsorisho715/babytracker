@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { useStore } from '../store/useStore';
 import { CATEGORY_EMOJIS } from '../data/seedData';
 import type { Player, PointTier, Task } from '../types';
@@ -8,6 +9,7 @@ function PlayerCard({ player }: { player: Player }) {
   const { scores, tasks, shopping } = useStore();
   const score = scores[player];
   const isSage = player === 'johnathan';
+  if (!score) return null;
 
   const total =
     tasks.filter(t => t.completedBy === player && t.status === 'done').length +
@@ -66,7 +68,7 @@ function PlayerCard({ player }: { player: Player }) {
 
 function CategoryProgress() {
   const { tasks, setActiveTabWithCategory } = useStore();
-  const categories = [...new Set(tasks.map(t => t.category))];
+  const categories = useMemo(() => [...new Set(tasks.map(t => t.category))], [tasks]);
 
   return (
     <div className="card">
@@ -75,7 +77,7 @@ function CategoryProgress() {
         {categories.map(cat => {
           const catTasks = tasks.filter(t => t.category === cat);
           const done = catTasks.filter(t => t.status === 'done').length;
-          const pct = Math.round((done / catTasks.length) * 100);
+          const pct = catTasks.length > 0 ? Math.round((done / catTasks.length) * 100) : 0;
           const emoji = CATEGORY_EMOJIS[cat] ?? '📋';
           return (
             <button
@@ -109,23 +111,21 @@ function CategoryProgress() {
 function AssignedCard() {
   const { tasks, activePlayer, scores, setActiveTab } = useStore();
   const otherPlayer: Player = activePlayer === 'johnathan' ? 'jordyn' : 'johnathan';
-  const myName = scores[activePlayer].displayName;
+  const myName = scores[activePlayer]?.displayName ?? activePlayer;
 
-  const byPointsDesc = (a: Task, b: Task) => (b.points ?? 0) - (a.points ?? 0);
-  const today = new Date().toISOString().slice(0, 10);
+  const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
 
-  // Tasks assigned to me (claimed by me or team tasks)
-  const toMe = tasks.filter(
-    t => t.status !== 'done' && (t.claimedBy === activePlayer || t.assignedToBoth)
-  ).sort(byPointsDesc);
-
-  // Tasks I assigned out to partner
-  const byMe = tasks.filter(t => t.assignedBy === activePlayer && t.status !== 'done');
-
-  // Overdue: not done, has a due date in the past
-  const overdue = tasks.filter(
-    t => t.status !== 'done' && t.dueDate && t.dueDate < today
-  ).length;
+  const { toMe, byMe, overdue } = useMemo(() => {
+    const byPointsDesc = (a: Task, b: Task) => (b.points ?? 0) - (a.points ?? 0);
+    const toMe = tasks.filter(
+      t => t.status !== 'done' && (t.claimedBy === activePlayer || t.assignedToBoth)
+    ).sort(byPointsDesc);
+    const byMe = tasks.filter(t => t.assignedBy === activePlayer && t.status !== 'done');
+    const overdue = tasks.filter(
+      t => t.status !== 'done' && t.dueDate && t.dueDate < today
+    ).length;
+    return { toMe, byMe, overdue };
+  }, [tasks, activePlayer, today]);
 
   const hasAny = toMe.length > 0 || byMe.length > 0;
 
@@ -183,7 +183,7 @@ function AssignedCard() {
               <span className="text-xs font-display font-600 text-gray-800 flex-1 truncate">{t.task}</span>
               {t.assignedBy && (
                 <span className="text-[10px] text-rose-medium font-display font-700">
-                  from {scores[otherPlayer].displayName}
+                  from {scores[otherPlayer]?.displayName ?? otherPlayer}
                 </span>
               )}
             </div>
@@ -201,22 +201,26 @@ function AssignedCard() {
 
 function QuickStats() {
   const { tasks, shopping, goals, dailyCompletions, activePlayer, setActiveTab } = useStore();
-  const today = new Date().toISOString().slice(0, 10);
+  const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
 
-  const pendingTasks = tasks.filter(t => t.status !== 'done' && !t.isDaily).length;
-  const completedTasks = tasks.filter(t => t.status === 'done').length;
-  const purchasedShopping = shopping.filter(s => s.status === 'Purchased').length;
-  const completedGoals = goals.filter(g => g.completed).length;
-  const unassignedTasks = tasks.filter(
-    t => t.status !== 'done' && !t.isDaily && !t.claimedBy && !t.assignedToBoth
-  ).length;
+  const stats_data = useMemo(() => {
+    const pendingTasks = tasks.filter(t => t.status !== 'done' && !t.isDaily).length;
+    const completedTasks = tasks.filter(t => t.status === 'done').length;
+    const purchasedShopping = shopping.filter(s => s.status === 'Purchased').length;
+    const completedGoals = goals.filter(g => g.completed).length;
+    const unassignedTasks = tasks.filter(
+      t => t.status !== 'done' && !t.isDaily && !t.claimedBy && !t.assignedToBoth
+    ).length;
+    const dailyTasks = tasks.filter(t =>
+      t.isDaily && (t.assignedToBoth || !t.claimedBy || t.claimedBy === activePlayer)
+    );
+    const doneToday = dailyTasks.filter(t =>
+      dailyCompletions.some(c => c.taskId === t.id && c.date === today)
+    ).length;
+    return { pendingTasks, completedTasks, purchasedShopping, completedGoals, unassignedTasks, dailyTasks, doneToday };
+  }, [tasks, shopping, goals, dailyCompletions, activePlayer, today]);
 
-  const dailyTasks = tasks.filter(t =>
-    t.isDaily && (t.assignedToBoth || !t.claimedBy || t.claimedBy === activePlayer)
-  );
-  const doneToday = dailyTasks.filter(t =>
-    dailyCompletions.some(c => c.taskId === t.id && c.date === today)
-  ).length;
+  const { pendingTasks, completedTasks, purchasedShopping, completedGoals, unassignedTasks, dailyTasks, doneToday } = stats_data;
   const dailyLabel = dailyTasks.length > 0 ? `${doneToday}/${dailyTasks.length}` : '—';
 
   const stats = [
@@ -387,11 +391,13 @@ export default function Dashboard() {
   const { tasks, shopping, scores, settings, isLoaded, loadSeedData } = useStore();
   const totalDone = tasks.filter(t => t.status === 'done').length + shopping.filter(s => s.status === 'Purchased').length;
   const totalItems = tasks.length + shopping.length;
-  const totalPoints = scores.johnathan.totalPoints + scores.jordyn.totalPoints;
+  const johnPts = scores.johnathan?.totalPoints ?? 0;
+  const jordynPts = scores.jordyn?.totalPoints ?? 0;
+  const totalPoints = johnPts + jordynPts;
   const overallPct = totalItems ? Math.round((totalDone / totalItems) * 100) : 0;
 
-  const leader = scores.johnathan.totalPoints >= scores.jordyn.totalPoints ? scores.johnathan : scores.jordyn;
-  const isNeckAndNeck = Math.abs(scores.johnathan.totalPoints - scores.jordyn.totalPoints) < 20;
+  const leader = johnPts >= jordynPts ? (scores.johnathan ?? scores.jordyn) : (scores.jordyn ?? scores.johnathan);
+  const isNeckAndNeck = Math.abs(johnPts - jordynPts) < 20;
 
 
   return (

@@ -123,7 +123,7 @@ function ShoppingCard({ item, onEdit }: ShoppingCardProps) {
           <button
             onClick={() => unpurchaseItem(item.id)}
             title="Undo purchase"
-            className="w-8 h-8 rounded-xl bg-cream-100 text-warm-gray hover:bg-cream-200 flex items-center justify-center"
+            className="w-9 h-9 rounded-xl bg-cream-100 text-warm-gray hover:bg-cream-200 flex items-center justify-center"
           >
             <RotateCcw className="w-3.5 h-3.5" />
           </button>
@@ -134,21 +134,21 @@ function ShoppingCard({ item, onEdit }: ShoppingCardProps) {
             <button
               onClick={() => setShowMove(v => !v)}
               title="Move to..."
-              className="w-8 h-8 rounded-xl bg-cream-100 text-warm-gray hover:bg-cream-200 flex items-center justify-center"
+              className="w-9 h-9 rounded-xl bg-cream-100 text-warm-gray hover:bg-cream-200 flex items-center justify-center"
             >
               <ArrowRightLeft className="w-3.5 h-3.5" />
             </button>
             {showMove && (
-              <div className="absolute right-0 top-9 z-20 bg-white rounded-2xl shadow-md border border-cream-200 min-w-[140px] overflow-hidden">
+              <div className="absolute right-0 top-10 z-20 bg-white rounded-2xl shadow-md border border-cream-200 min-w-[140px] overflow-hidden">
                 <button
                   onClick={() => { convertShoppingToTask(item.id); setShowMove(false); }}
-                  className="w-full text-left px-4 py-2.5 text-xs font-display font-600 text-gray-700 hover:bg-cream-100"
+                  className="w-full text-left px-4 py-3 text-xs font-display font-600 text-gray-700 hover:bg-cream-100"
                 >
                   ✅ Move to Tasks
                 </button>
                 <button
                   onClick={() => { convertShoppingToGoal(item.id); setShowMove(false); }}
-                  className="w-full text-left px-4 py-2.5 text-xs font-display font-600 text-gray-700 hover:bg-cream-100"
+                  className="w-full text-left px-4 py-3 text-xs font-display font-600 text-gray-700 hover:bg-cream-100"
                 >
                   🎯 Move to Goals
                 </button>
@@ -158,7 +158,7 @@ function ShoppingCard({ item, onEdit }: ShoppingCardProps) {
         )}
         <button
           onClick={onEdit}
-          className="w-8 h-8 rounded-xl bg-cream-100 text-warm-gray hover:bg-sage-100 hover:text-sage-500 flex items-center justify-center"
+          className="w-9 h-9 rounded-xl bg-cream-100 text-warm-gray hover:bg-sage-100 hover:text-sage-500 flex items-center justify-center"
         >
           <Pencil className="w-3.5 h-3.5" />
         </button>
@@ -166,21 +166,21 @@ function ShoppingCard({ item, onEdit }: ShoppingCardProps) {
           <div className="flex gap-1">
             <button
               onClick={() => deleteShoppingItem(item.id)}
-              className="text-xs bg-red-100 text-red-600 font-display font-700 px-2 py-1 rounded-lg"
+              className="text-xs bg-red-100 text-red-600 font-display font-700 px-3 py-2 rounded-lg min-h-[36px] flex items-center"
             >
               Delete{isPurchased ? ' (-' + item.points + 'pts)' : ''}
             </button>
             <button
               onClick={() => setConfirmDelete(false)}
-              className="text-xs bg-cream-100 text-warm-gray font-display font-700 px-2 py-1 rounded-lg"
+              className="text-xs bg-cream-100 text-warm-gray font-display font-700 px-3 py-2 rounded-lg min-h-[36px] flex items-center"
             >
-              Cancel
+              No
             </button>
           </div>
         ) : (
           <button
             onClick={() => setConfirmDelete(true)}
-            className="w-8 h-8 rounded-xl bg-cream-100 text-warm-gray hover:bg-red-50 hover:text-red-400 flex items-center justify-center"
+            className="w-9 h-9 rounded-xl bg-cream-100 text-warm-gray hover:bg-red-50 hover:text-red-400 flex items-center justify-center"
           >
             <Trash2 className="w-3.5 h-3.5" />
           </button>

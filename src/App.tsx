@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef, useCallback } from 'react';
 import confetti from 'canvas-confetti';
 import { useStore } from './store/useStore';
 import { supabase } from './lib/supabase';
@@ -26,26 +26,23 @@ function CountdownBanner() {
   const now = new Date();
   const due = new Date(dueDate + 'T00:00:00');
   const diffMs = due.getTime() - now.getTime();
-
-  const totalHours = Math.floor(diffMs / (1000 * 60 * 60));
+  const absDiffMs = Math.abs(diffMs);
+  const totalHours = Math.floor(absDiffMs / (1000 * 60 * 60));
   const days = Math.floor(totalHours / 24);
   const hours = totalHours % 24;
 
   let text: string;
   if (diffMs > 0) {
-    text = `${days} day${days !== 1 ? 's' : ''}, ${hours} hour${hours !== 1 ? 's' : ''} until ${settings.babyName} arrives!`;
-  } else if (diffMs > -24 * 60 * 60 * 1000) {
-    text = `Today's the day! ${settings.babyName} is coming!`;
+    text = `${days}d ${hours}h until ${settings.babyName} arrives! 🍼`;
+  } else if (absDiffMs < 24 * 60 * 60 * 1000) {
+    text = `Today's the day! ${settings.babyName} is coming! 🎉`;
   } else {
-    const agoTotalHours = Math.abs(totalHours);
-    const agoDays = Math.floor(agoTotalHours / 24);
-    const agoHours = agoTotalHours % 24;
-    text = `${agoDays} day${agoDays !== 1 ? 's' : ''}, ${agoHours} hour${agoHours !== 1 ? 's' : ''} past due`;
+    text = `${days}d ${hours}h since ${settings.babyName}'s due date`;
   }
 
   return (
     <div className="bg-gradient-to-r from-sage-100 to-rose-50 border-b border-cream-200 py-2 px-4">
-      <p className="text-center text-sm font-display font-700 text-gray-800">
+      <p className="text-center text-sm font-display font-700 text-gray-800 truncate">
         {text}
       </p>
     </div>
@@ -74,7 +71,7 @@ function Header() {
             <PlayerToggle />
             <button
               onClick={() => setShowSettings(true)}
-              className="w-9 h-9 rounded-xl bg-cream-200 text-warm-gray hover:bg-cream-300 flex items-center justify-center"
+              className="w-10 h-10 rounded-xl bg-cream-200 text-warm-gray hover:bg-cream-300 flex items-center justify-center"
             >
               <Settings className="w-4 h-4" />
             </button>
@@ -88,6 +85,15 @@ function Header() {
 
 export default function App() {
   const { activeTab, isLoaded, loadSeedData, updateSettingsFromSync, confettiTrigger } = useStore();
+
+  // Debounced reload — batches rapid subscription events into a single fetch
+  const reloadTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const debouncedReload = useCallback(() => {
+    if (reloadTimerRef.current) clearTimeout(reloadTimerRef.current);
+    reloadTimerRef.current = setTimeout(() => {
+      loadSeedData(true);
+    }, 500);
+  }, [loadSeedData]);
 
   useEffect(() => {
     if (confettiTrigger === 0) return;
@@ -110,17 +116,18 @@ export default function App() {
     return () => document.removeEventListener('visibilitychange', onVisibilityChange);
   }, [loadSeedData]);
 
-  // Set up real-time listeners for Supabase
+  // Set up real-time listeners for Supabase (debounced to batch rapid changes)
   useEffect(() => {
     if (!SUPABASE_ENABLED) return;
 
     const subscription = supabase
       .channel('public:sync')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks' }, () => loadSeedData(true))
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'shopping_items' }, () => loadSeedData(true))
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'goals' }, () => loadSeedData(true))
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'player_scores' }, () => loadSeedData(true))
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'daily_completions' }, () => loadSeedData(true))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks' }, debouncedReload)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'shopping_items' }, debouncedReload)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'goals' }, debouncedReload)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'player_scores' }, debouncedReload)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'daily_completions' }, debouncedReload)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'badges' }, debouncedReload)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'app_settings' }, (payload: { new?: { baby_name?: string; due_date?: string | null; pregnancy_week?: number | null } }) => {
         const row = payload.new;
         if (row) {
@@ -134,9 +141,10 @@ export default function App() {
       .subscribe();
 
     return () => {
+      if (reloadTimerRef.current) clearTimeout(reloadTimerRef.current);
       subscription.unsubscribe();
     };
-  }, [loadSeedData, updateSettingsFromSync]);
+  }, [debouncedReload, updateSettingsFromSync]);
 
   const handleRefresh = () => loadSeedData(true);
 

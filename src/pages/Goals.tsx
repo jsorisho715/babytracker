@@ -114,7 +114,7 @@ function GoalCard({ goal, onEdit }: GoalCardProps) {
     <div className={`card flex items-start gap-3 transition-all ${goal.completed ? 'opacity-70' : ''}`}>
       <button
         onClick={() => completeGoal(goal.id)}
-        className={`mt-0.5 w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 transition-all ${
+        className={`mt-0.5 w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 transition-all ${
           goal.completed
             ? 'bg-sage-400 text-white'
             : 'bg-cream-200 text-warm-gray hover:bg-sage-100 hover:text-sage-500'
@@ -159,23 +159,23 @@ function GoalCard({ goal, onEdit }: GoalCardProps) {
             <button
               onClick={() => setShowAssign(v => !v)}
               title="Assign to..."
-              className="w-8 h-8 rounded-xl bg-cream-100 text-warm-gray hover:bg-rose-50 hover:text-rose-medium flex items-center justify-center"
+              className="w-9 h-9 rounded-xl bg-cream-100 text-warm-gray hover:bg-rose-50 hover:text-rose-medium flex items-center justify-center"
             >
               <UserPlus className="w-3.5 h-3.5" />
             </button>
             {showAssign && (
-              <div className="absolute right-0 top-9 z-20 bg-white rounded-2xl shadow-md border border-cream-200 min-w-[170px] overflow-hidden">
+              <div className="absolute right-0 top-10 z-20 bg-white rounded-2xl shadow-md border border-cream-200 min-w-[170px] overflow-hidden">
                 <button
                   onClick={() => { assignGoal(goal.id, activePlayer); setShowAssign(false); }}
-                  className="w-full text-left px-4 py-2.5 text-xs font-display font-600 text-gray-700 hover:bg-cream-100"
+                  className="w-full text-left px-4 py-3 text-xs font-display font-600 text-gray-700 hover:bg-cream-100"
                 >👤 Assign to me</button>
                 <button
                   onClick={() => { assignGoal(goal.id, otherPlayer); setShowAssign(false); }}
-                  className="w-full text-left px-4 py-2.5 text-xs font-display font-600 text-gray-700 hover:bg-cream-100"
+                  className="w-full text-left px-4 py-3 text-xs font-display font-600 text-gray-700 hover:bg-cream-100"
                 >👤 Assign to {otherName}</button>
                 <button
                   onClick={() => { assignGoalToBoth(goal.id); setShowAssign(false); }}
-                  className="w-full text-left px-4 py-2.5 text-xs font-display font-600 text-yellow-700 hover:bg-yellow-50 border-t border-cream-200"
+                  className="w-full text-left px-4 py-3 text-xs font-display font-600 text-yellow-700 hover:bg-yellow-50 border-t border-cream-200"
                 >🤝 Team task (both)</button>
               </div>
             )}
@@ -185,7 +185,7 @@ function GoalCard({ goal, onEdit }: GoalCardProps) {
           <button
             onClick={() => unassignGoal(goal.id)}
             title="Unassign"
-            className="w-8 h-8 rounded-xl bg-cream-100 text-warm-gray hover:bg-red-50 hover:text-red-400 flex items-center justify-center"
+            className="w-9 h-9 rounded-xl bg-cream-100 text-warm-gray hover:bg-red-50 hover:text-red-400 flex items-center justify-center"
           >
             <UserX className="w-3.5 h-3.5" />
           </button>
@@ -197,21 +197,21 @@ function GoalCard({ goal, onEdit }: GoalCardProps) {
             <button
               onClick={() => setShowMove(v => !v)}
               title="Move to..."
-              className="w-8 h-8 rounded-xl bg-cream-100 text-warm-gray hover:bg-cream-200 flex items-center justify-center"
+              className="w-9 h-9 rounded-xl bg-cream-100 text-warm-gray hover:bg-cream-200 flex items-center justify-center"
             >
               <ArrowRightLeft className="w-3.5 h-3.5" />
             </button>
             {showMove && (
-              <div className="absolute right-0 top-9 z-20 bg-white rounded-2xl shadow-md border border-cream-200 min-w-[150px] overflow-hidden">
+              <div className="absolute right-0 top-10 z-20 bg-white rounded-2xl shadow-md border border-cream-200 min-w-[150px] overflow-hidden">
                 <button
                   onClick={() => { convertGoalToTask(goal.id); setShowMove(false); }}
-                  className="w-full text-left px-4 py-2.5 text-xs font-display font-600 text-gray-700 hover:bg-cream-100"
+                  className="w-full text-left px-4 py-3 text-xs font-display font-600 text-gray-700 hover:bg-cream-100"
                 >
                   ✅ Move to Tasks
                 </button>
                 <button
                   onClick={() => { convertGoalToShopping(goal.id); setShowMove(false); }}
-                  className="w-full text-left px-4 py-2.5 text-xs font-display font-600 text-gray-700 hover:bg-cream-100"
+                  className="w-full text-left px-4 py-3 text-xs font-display font-600 text-gray-700 hover:bg-cream-100"
                 >
                   🛒 Move to Shopping
                 </button>
@@ -221,23 +221,23 @@ function GoalCard({ goal, onEdit }: GoalCardProps) {
         )}
         <button
           onClick={onEdit}
-          className="w-8 h-8 rounded-xl bg-cream-100 text-warm-gray hover:bg-sage-100 hover:text-sage-500 flex items-center justify-center"
+          className="w-9 h-9 rounded-xl bg-cream-100 text-warm-gray hover:bg-sage-100 hover:text-sage-500 flex items-center justify-center"
         >
           <Pencil className="w-3.5 h-3.5" />
         </button>
         {confirmDelete ? (
           <div className="flex gap-1">
-            <button onClick={() => deleteGoal(goal.id)} className="text-xs bg-red-100 text-red-600 font-display font-700 px-2 py-1 rounded-lg">
+            <button onClick={() => deleteGoal(goal.id)} className="text-xs bg-red-100 text-red-600 font-display font-700 px-3 py-2 rounded-lg min-h-[36px] flex items-center">
               Delete
             </button>
-            <button onClick={() => setConfirmDelete(false)} className="text-xs bg-cream-100 text-warm-gray font-display font-700 px-2 py-1 rounded-lg">
+            <button onClick={() => setConfirmDelete(false)} className="text-xs bg-cream-100 text-warm-gray font-display font-700 px-3 py-2 rounded-lg min-h-[36px] flex items-center">
               No
             </button>
           </div>
         ) : (
           <button
             onClick={() => setConfirmDelete(true)}
-            className="w-8 h-8 rounded-xl bg-cream-100 text-warm-gray hover:bg-red-50 hover:text-red-400 flex items-center justify-center"
+            className="w-9 h-9 rounded-xl bg-cream-100 text-warm-gray hover:bg-red-50 hover:text-red-400 flex items-center justify-center"
           >
             <Trash2 className="w-3.5 h-3.5" />
           </button>

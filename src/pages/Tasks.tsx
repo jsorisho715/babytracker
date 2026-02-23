@@ -288,27 +288,27 @@ function TaskCard({ task, onEdit }: TaskCardProps) {
               <button
                 onClick={() => setShowAssign(v => !v)}
                 title="Assign to..."
-                className="w-8 h-8 rounded-xl bg-cream-100 text-warm-gray hover:bg-rose-50 hover:text-rose-medium flex items-center justify-center"
+                className="w-9 h-9 rounded-xl bg-cream-100 text-warm-gray hover:bg-rose-50 hover:text-rose-medium flex items-center justify-center"
               >
                 <UserPlus className="w-3.5 h-3.5" />
               </button>
               {showAssign && (
-                <div className="absolute right-0 top-9 z-20 bg-white rounded-2xl shadow-md border border-cream-200 min-w-[170px] overflow-hidden">
+                <div className="absolute right-0 top-10 z-20 bg-white rounded-2xl shadow-md border border-cream-200 min-w-[170px] overflow-hidden">
                   <button
                     onClick={() => { assignTask(task.id, activePlayer); setShowAssign(false); }}
-                    className="w-full text-left px-4 py-2.5 text-xs font-display font-600 text-gray-700 hover:bg-cream-100"
+                    className="w-full text-left px-4 py-3 text-xs font-display font-600 text-gray-700 hover:bg-cream-100"
                   >
                     👤 Assign to me
                   </button>
                   <button
                     onClick={() => { assignTask(task.id, otherPlayer); setShowAssign(false); }}
-                    className="w-full text-left px-4 py-2.5 text-xs font-display font-600 text-gray-700 hover:bg-cream-100"
+                    className="w-full text-left px-4 py-3 text-xs font-display font-600 text-gray-700 hover:bg-cream-100"
                   >
                     👥 Assign to {otherName}
                   </button>
                   <button
                     onClick={() => { assignTaskToBoth(task.id); setShowAssign(false); }}
-                    className="w-full text-left px-4 py-2.5 text-xs font-display font-600 text-yellow-700 hover:bg-yellow-50 border-t border-cream-200"
+                    className="w-full text-left px-4 py-3 text-xs font-display font-600 text-yellow-700 hover:bg-yellow-50 border-t border-cream-200"
                   >
                     🤝 Team task (both)
                   </button>
@@ -322,7 +322,7 @@ function TaskCard({ task, onEdit }: TaskCardProps) {
             <button
               onClick={() => unassignTask(task.id)}
               title="Unassign"
-              className="w-8 h-8 rounded-xl bg-cream-100 text-warm-gray hover:bg-red-50 hover:text-red-400 flex items-center justify-center"
+              className="w-9 h-9 rounded-xl bg-cream-100 text-warm-gray hover:bg-red-50 hover:text-red-400 flex items-center justify-center"
             >
               <UserX className="w-3.5 h-3.5" />
             </button>
@@ -334,12 +334,12 @@ function TaskCard({ task, onEdit }: TaskCardProps) {
               <button
                 onClick={() => setShowMove(v => !v)}
                 title="Move to..."
-                className="w-8 h-8 rounded-xl bg-cream-100 text-warm-gray hover:bg-cream-200 flex items-center justify-center"
+                className="w-9 h-9 rounded-xl bg-cream-100 text-warm-gray hover:bg-cream-200 flex items-center justify-center"
               >
                 <ArrowRightLeft className="w-3.5 h-3.5" />
               </button>
               {showMove && (
-                <div className="absolute right-0 top-9 z-20 bg-white rounded-2xl shadow-md border border-cream-200 min-w-[140px] overflow-hidden">
+                <div className="absolute right-0 top-10 z-20 bg-white rounded-2xl shadow-md border border-cream-200 min-w-[140px] overflow-hidden">
                   <button
                     onClick={() => { convertTaskToShopping(task.id); setShowMove(false); }}
                     className="w-full text-left px-4 py-2.5 text-xs font-display font-600 text-gray-700 hover:bg-cream-100 flex items-center gap-2"
@@ -359,7 +359,7 @@ function TaskCard({ task, onEdit }: TaskCardProps) {
 
           <button
             onClick={onEdit}
-            className="w-8 h-8 rounded-xl bg-cream-100 text-warm-gray hover:bg-sage-100 hover:text-sage-500 flex items-center justify-center"
+            className="w-9 h-9 rounded-xl bg-cream-100 text-warm-gray hover:bg-sage-100 hover:text-sage-500 flex items-center justify-center"
           >
             <Pencil className="w-3.5 h-3.5" />
           </button>
@@ -367,13 +367,13 @@ function TaskCard({ task, onEdit }: TaskCardProps) {
             <div className="flex gap-1">
               <button
                 onClick={() => deleteTask(task.id)}
-                className="text-xs bg-red-100 text-red-600 font-display font-700 px-2 py-1 rounded-lg whitespace-nowrap"
+                className="text-xs bg-red-100 text-red-600 font-display font-700 px-3 py-2 rounded-lg whitespace-nowrap min-h-[36px] flex items-center"
               >
                 Delete{isDone ? ` (-${task.points}pts)` : ''}
               </button>
               <button
                 onClick={() => setConfirmDelete(false)}
-                className="text-xs bg-cream-100 text-warm-gray font-display font-700 px-2 py-1 rounded-lg"
+                className="text-xs bg-cream-100 text-warm-gray font-display font-700 px-3 py-2 rounded-lg min-h-[36px] flex items-center"
               >
                 No
               </button>
@@ -381,7 +381,7 @@ function TaskCard({ task, onEdit }: TaskCardProps) {
           ) : (
             <button
               onClick={() => setConfirmDelete(true)}
-              className="w-8 h-8 rounded-xl bg-cream-100 text-warm-gray hover:bg-red-50 hover:text-red-400 flex items-center justify-center"
+              className="w-9 h-9 rounded-xl bg-cream-100 text-warm-gray hover:bg-red-50 hover:text-red-400 flex items-center justify-center"
             >
               <Trash2 className="w-3.5 h-3.5" />
             </button>
