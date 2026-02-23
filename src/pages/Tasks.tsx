@@ -1,11 +1,11 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useStore } from '../store/useStore';
 import type { Task, PointTier, Player } from '../types';
 import { CATEGORY_EMOJIS, TASK_CATEGORIES } from '../data/seedData';
 import PointsBadge from '../components/PointsBadge';
-import { Plus, Pencil, Trash2, Check, ChevronDown, ChevronUp, Flag, UserPlus, ArrowRightLeft, UserX } from 'lucide-react';
+import { Plus, Pencil, Trash2, Check, ChevronDown, ChevronUp, Flag, UserPlus, ArrowRightLeft, UserX, Calendar } from 'lucide-react';
 
-type Filter = 'all' | 'pending' | 'claimed' | 'done';
+type Filter = 'all' | 'pending' | 'claimed' | 'done' | 'unassigned';
 
 interface TaskFormProps {
   initial?: Partial<Task>;
@@ -14,6 +14,7 @@ interface TaskFormProps {
 }
 
 function TaskForm({ initial, onSave, onCancel }: TaskFormProps) {
+  const { activePlayer, scores } = useStore();
   const [taskName, setTaskName] = useState(initial?.task ?? '');
   const [category, setCategory] = useState(initial?.category ?? 'Nursery');
   const [priority, setPriority] = useState<Task['priority']>(initial?.priority ?? 'Medium');
@@ -21,9 +22,23 @@ function TaskForm({ initial, onSave, onCancel }: TaskFormProps) {
   const [notes, setNotes] = useState(initial?.notes ?? '');
   const [points, setPoints] = useState<PointTier>(initial?.points ?? 25);
   const [isDaily, setIsDaily] = useState(initial?.isDaily ?? false);
+  const [dueDate, setDueDate] = useState(initial?.dueDate ?? '');
+  const [assignTo, setAssignTo] = useState<'none' | 'me' | 'other' | 'both'>(
+    initial?.assignedToBoth ? 'both' : initial?.claimedBy === activePlayer ? 'me' : initial?.claimedBy ? 'other' : 'none'
+  );
+
+  const otherPlayer: Player = activePlayer === 'johnathan' ? 'jordyn' : 'johnathan';
+  const myName = scores[activePlayer].displayName;
+  const otherName = scores[otherPlayer].displayName;
 
   const handleSave = () => {
     if (!taskName.trim()) return;
+    let claimedBy: Player | undefined;
+    let assignedBy: Player | undefined;
+    let assignedToBoth = false;
+    if (assignTo === 'me') { claimedBy = activePlayer; assignedBy = activePlayer; }
+    else if (assignTo === 'other') { claimedBy = otherPlayer; assignedBy = activePlayer; }
+    else if (assignTo === 'both') { assignedToBoth = true; }
     onSave({
       task: taskName.trim(),
       category,
@@ -32,10 +47,12 @@ function TaskForm({ initial, onSave, onCancel }: TaskFormProps) {
       notes: notes.trim() || undefined,
       points,
       isDaily,
-      status: initial?.status ?? 'pending',
+      dueDate: dueDate || undefined,
+      status: (claimedBy || assignedToBoth) ? 'claimed' : (initial?.status ?? 'pending'),
       completedBy: initial?.completedBy,
-      claimedBy: initial?.claimedBy,
-      assignedBy: initial?.assignedBy,
+      claimedBy: assignTo !== 'none' ? claimedBy : initial?.claimedBy,
+      assignedBy: assignTo !== 'none' ? assignedBy : initial?.assignedBy,
+      assignedToBoth: assignTo !== 'none' ? assignedToBoth : (initial?.assignedToBoth ?? false),
       completedAt: initial?.completedAt,
     });
   };
@@ -49,13 +66,13 @@ function TaskForm({ initial, onSave, onCancel }: TaskFormProps) {
         value={taskName}
         onChange={e => setTaskName(e.target.value)}
         placeholder="Task description"
-        className="w-full px-4 py-2.5 bg-cream-100 rounded-xl text-sm font-display font-500 border-none outline-none focus:ring-2 focus:ring-sage-300"
+        className="w-full px-4 py-2.5 bg-cream-100 rounded-xl text-base font-display font-500 border-none outline-none focus:ring-2 focus:ring-sage-300"
       />
       <div className="flex gap-2">
         <select
           value={category}
           onChange={e => setCategory(e.target.value)}
-          className="flex-1 px-3 py-2.5 bg-cream-100 rounded-xl text-sm font-display font-600 border-none outline-none focus:ring-2 focus:ring-sage-300"
+          className="flex-1 px-3 py-2.5 bg-cream-100 rounded-xl text-base font-display font-600 border-none outline-none focus:ring-2 focus:ring-sage-300"
         >
           {TASK_CATEGORIES.map(c => (
             <option key={c} value={c}>{CATEGORY_EMOJIS[c]} {c}</option>
@@ -65,7 +82,7 @@ function TaskForm({ initial, onSave, onCancel }: TaskFormProps) {
         <select
           value={priority}
           onChange={e => setPriority(e.target.value as Task['priority'])}
-          className="flex-1 px-3 py-2.5 bg-cream-100 rounded-xl text-sm font-display font-600 border-none outline-none focus:ring-2 focus:ring-sage-300"
+          className="flex-1 px-3 py-2.5 bg-cream-100 rounded-xl text-base font-display font-600 border-none outline-none focus:ring-2 focus:ring-sage-300"
         >
           <option value="High">🔴 High</option>
           <option value="Medium">🟡 Medium</option>
@@ -77,13 +94,13 @@ function TaskForm({ initial, onSave, onCancel }: TaskFormProps) {
           type="text"
           value={timing}
           onChange={e => setTiming(e.target.value)}
-          placeholder="Timing (e.g. ASAP, Week 35)"
-          className="flex-1 px-4 py-2.5 bg-cream-100 rounded-xl text-sm font-display font-500 border-none outline-none focus:ring-2 focus:ring-sage-300"
+          placeholder="Timing (e.g. ASAP)"
+          className="flex-1 px-4 py-2.5 bg-cream-100 rounded-xl text-base font-display font-500 border-none outline-none focus:ring-2 focus:ring-sage-300"
         />
         <select
           value={points}
           onChange={e => setPoints(Number(e.target.value) as PointTier)}
-          className="flex-1 px-3 py-2.5 bg-cream-100 rounded-xl text-sm font-display font-600 border-none outline-none focus:ring-2 focus:ring-sage-300"
+          className="flex-1 px-3 py-2.5 bg-cream-100 rounded-xl text-base font-display font-600 border-none outline-none focus:ring-2 focus:ring-sage-300"
         >
           <option value={5}>⭐5 – Quick Win</option>
           <option value={10}>⭐10 – Easy</option>
@@ -92,12 +109,36 @@ function TaskForm({ initial, onSave, onCancel }: TaskFormProps) {
           <option value={100}>⭐100 – Boss!</option>
         </select>
       </div>
+      <div className="flex gap-2">
+        <div className="flex-1">
+          <label className="text-xs text-warm-gray font-display font-600 block mb-1">Due date (optional)</label>
+          <input
+            type="date"
+            value={dueDate}
+            onChange={e => setDueDate(e.target.value)}
+            className="w-full px-3 py-2.5 bg-cream-100 rounded-xl text-base font-display font-500 border-none outline-none focus:ring-2 focus:ring-sage-300"
+          />
+        </div>
+        <div className="flex-1">
+          <label className="text-xs text-warm-gray font-display font-600 block mb-1">Assign to</label>
+          <select
+            value={assignTo}
+            onChange={e => setAssignTo(e.target.value as 'none' | 'me' | 'other' | 'both')}
+            className="w-full px-3 py-2.5 bg-cream-100 rounded-xl text-base font-display font-600 border-none outline-none focus:ring-2 focus:ring-sage-300"
+          >
+            <option value="none">Unassigned</option>
+            <option value="me">👤 {myName}</option>
+            <option value="other">👤 {otherName}</option>
+            <option value="both">🤝 Team Luca</option>
+          </select>
+        </div>
+      </div>
       <input
         type="text"
         value={notes}
         onChange={e => setNotes(e.target.value)}
         placeholder="Notes (optional)"
-        className="w-full px-4 py-2.5 bg-cream-100 rounded-xl text-sm font-display font-500 border-none outline-none focus:ring-2 focus:ring-sage-300"
+        className="w-full px-4 py-2.5 bg-cream-100 rounded-xl text-base font-display font-500 border-none outline-none focus:ring-2 focus:ring-sage-300"
       />
       {/* Daily toggle */}
       <button
@@ -201,6 +242,17 @@ function TaskCard({ task, onEdit }: TaskCardProps) {
             <span className={`text-xs font-display font-600 ${PRIORITY_COLORS[task.priority]}`}>{task.priority}</span>
             <span className="text-xs text-warm-gray">· {task.timing}</span>
             <PointsBadge points={task.points as PointTier} />
+            {task.dueDate && (() => {
+              const today = new Date().toISOString().slice(0, 10);
+              const diff = Math.ceil((new Date(task.dueDate).getTime() - new Date(today).getTime()) / 86400000);
+              const color = diff < 0 ? 'text-red-500' : diff <= 3 ? 'text-amber-600' : 'text-warm-gray';
+              return (
+                <span className={`flex items-center gap-0.5 text-xs font-display font-600 ${color}`}>
+                  <Calendar className="w-3 h-3" />
+                  {diff < 0 ? `${Math.abs(diff)}d overdue` : diff === 0 ? 'Due today' : `Due in ${diff}d`}
+                </span>
+              );
+            })()}
           </div>
           {isClaimed && (
             <p className={`text-xs font-display font-600 mt-0.5 ${isTeam ? 'text-yellow-600' : task.claimedBy === 'johnathan' ? 'text-sage-500' : 'text-rose-medium'}`}>
@@ -396,14 +448,26 @@ function CategoryGroup({ category, tasks, defaultOpen, onEdit, editId, onCancelE
 }
 
 export default function Tasks() {
-  const { tasks, addTask, scores } = useStore();
+  const { tasks, addTask, scores, pendingCategoryFilter, setActiveTabWithCategory } = useStore();
   const [filter, setFilter] = useState<Filter>('all');
   const [showAdd, setShowAdd] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [dailyOnly, setDailyOnly] = useState(false);
 
+  // When navigating from Dashboard category progress, apply that category filter
+  useEffect(() => {
+    if (pendingCategoryFilter) {
+      setCategoryFilter(pendingCategoryFilter);
+      setDailyOnly(false);
+      setFilter('all');
+      // Clear the pending filter from store
+      setActiveTabWithCategory('tasks', undefined);
+    }
+  }, [pendingCategoryFilter, setActiveTabWithCategory]);
+
   const filtered = tasks.filter(t => {
+    if (filter === 'unassigned') return !t.claimedBy && !t.assignedToBoth && t.status !== 'done' && !t.isDaily;
     const statusMatch = filter === 'all' || t.status === filter;
     const catMatch = categoryFilter === 'all' || t.category === categoryFilter;
     const dailyMatch = !dailyOnly || t.isDaily;
@@ -422,6 +486,7 @@ export default function Tasks() {
     pending: tasks.filter(t => t.status === 'pending').length,
     claimed: tasks.filter(t => t.status === 'claimed').length,
     done: tasks.filter(t => t.status === 'done').length,
+    unassigned: tasks.filter(t => !t.claimedBy && !t.assignedToBoth && t.status !== 'done' && !t.isDaily).length,
   };
 
   const johnTasks = tasks.filter(t => t.completedBy === 'johnathan' && t.status === 'done').length;
@@ -441,16 +506,22 @@ export default function Tasks() {
         </div>
       </div>
 
-      {/* Status filter + Add */}
-      <div className="flex items-center justify-between gap-2">
-        <div className="flex gap-1.5 overflow-x-auto pb-0.5 -mx-1 px-1">
-          {(['all', 'pending', 'claimed', 'done'] as Filter[]).map(f => (
+      {/* Filters + Add button */}
+      <div className="flex items-center gap-2">
+        <div className="flex gap-1.5 overflow-x-auto pb-0.5 -mx-1 px-1 flex-1">
+          {([
+            { key: 'all', label: `All (${counts.all})` },
+            { key: 'pending', label: `Pending (${counts.pending})` },
+            { key: 'claimed', label: `In Progress (${counts.claimed})` },
+            { key: 'done', label: `Done (${counts.done})` },
+            { key: 'unassigned', label: `Unassigned (${counts.unassigned})` },
+          ] as { key: Filter; label: string }[]).map(({ key, label }) => (
             <button
-              key={f}
-              onClick={() => setFilter(f)}
-              className={`category-chip whitespace-nowrap flex-shrink-0 ${filter === f ? 'category-chip-active' : ''}`}
+              key={key}
+              onClick={() => { setFilter(key); if (key === 'unassigned') { setCategoryFilter('all'); setDailyOnly(false); } }}
+              className={`category-chip whitespace-nowrap flex-shrink-0 ${filter === key ? 'category-chip-active' : ''}`}
             >
-              {f === 'all' ? `All (${counts.all})` : f === 'pending' ? `Pending (${counts.pending})` : f === 'claimed' ? `In Progress (${counts.claimed})` : `Done (${counts.done})`}
+              {label}
             </button>
           ))}
         </div>
@@ -462,30 +533,32 @@ export default function Tasks() {
         </button>
       </div>
 
-      {/* Category + Daily filter */}
-      <div className="flex gap-1.5 overflow-x-auto pb-0.5 -mx-4 px-4">
-        <button
-          onClick={() => setCategoryFilter('all')}
-          className={`category-chip whitespace-nowrap flex-shrink-0 ${categoryFilter === 'all' && !dailyOnly ? 'category-chip-active' : ''}`}
-        >
-          📋 All
-        </button>
-        <button
-          onClick={() => { setDailyOnly(v => !v); setCategoryFilter('all'); }}
-          className={`category-chip whitespace-nowrap flex-shrink-0 ${dailyOnly ? 'category-chip-active' : ''}`}
-        >
-          🔄 Daily
-        </button>
-        {categories.map(cat => (
+      {/* Category + Daily filter chips */}
+      {filter !== 'unassigned' && (
+        <div className="flex gap-1.5 overflow-x-auto pb-0.5 -mx-4 px-4">
           <button
-            key={cat}
-            onClick={() => { setCategoryFilter(cat); setDailyOnly(false); }}
-            className={`category-chip whitespace-nowrap flex-shrink-0 ${categoryFilter === cat && !dailyOnly ? 'category-chip-active' : ''}`}
+            onClick={() => { setCategoryFilter('all'); setDailyOnly(false); }}
+            className={`category-chip whitespace-nowrap flex-shrink-0 ${categoryFilter === 'all' && !dailyOnly ? 'category-chip-active' : ''}`}
           >
-            {CATEGORY_EMOJIS[cat] ?? '📋'} {cat}
+            📋 All
           </button>
-        ))}
-      </div>
+          <button
+            onClick={() => { setDailyOnly(v => !v); setCategoryFilter('all'); }}
+            className={`category-chip whitespace-nowrap flex-shrink-0 ${dailyOnly ? 'category-chip-active' : ''}`}
+          >
+            🔄 Daily
+          </button>
+          {categories.map(cat => (
+            <button
+              key={cat}
+              onClick={() => { setCategoryFilter(cat); setDailyOnly(false); }}
+              className={`category-chip whitespace-nowrap flex-shrink-0 ${categoryFilter === cat && !dailyOnly ? 'category-chip-active' : ''}`}
+            >
+              {CATEGORY_EMOJIS[cat] ?? '📋'} {cat}
+            </button>
+          ))}
+        </div>
+      )}
 
       {showAdd && (
         <TaskForm

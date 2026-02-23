@@ -65,7 +65,7 @@ function PlayerCard({ player }: { player: Player }) {
 }
 
 function CategoryProgress() {
-  const { tasks, setActiveTab } = useStore();
+  const { tasks, setActiveTabWithCategory } = useStore();
   const categories = [...new Set(tasks.map(t => t.category))];
 
   return (
@@ -80,7 +80,7 @@ function CategoryProgress() {
           return (
             <button
               key={cat}
-              onClick={() => setActiveTab('tasks')}
+              onClick={() => setActiveTabWithCategory('tasks', cat)}
               className="w-full text-left group"
             >
               <div className="flex items-center justify-between mb-1">
@@ -112,6 +112,7 @@ function AssignedCard() {
   const myName = scores[activePlayer].displayName;
 
   const byPointsDesc = (a: Task, b: Task) => (b.points ?? 0) - (a.points ?? 0);
+  const today = new Date().toISOString().slice(0, 10);
 
   // Tasks assigned to me (claimed by me or team tasks)
   const toMe = tasks.filter(
@@ -121,11 +122,10 @@ function AssignedCard() {
   // Tasks I assigned out to partner
   const byMe = tasks.filter(t => t.assignedBy === activePlayer && t.status !== 'done');
 
-  // All unique assigned tasks (total)
-  const totalAssigned = new Map(
-    [...toMe, ...byMe.filter(t => !t.assignedToBoth && t.claimedBy !== activePlayer)]
-      .map(t => [t.id, t])
-  ).size;
+  // Overdue: not done, has a due date in the past
+  const overdue = tasks.filter(
+    t => t.status !== 'done' && t.dueDate && t.dueDate < today
+  ).length;
 
   const hasAny = toMe.length > 0 || byMe.length > 0;
 
@@ -162,11 +162,11 @@ function AssignedCard() {
       </div>
       <div className="grid grid-cols-2 gap-2">
         <button
-          onClick={() => setActiveTab('assigned')}
-          className="bg-cream-100 rounded-2xl p-3 text-left min-h-[60px]"
+          onClick={() => setActiveTab('tasks')}
+          className={`rounded-2xl p-3 text-left min-h-[60px] ${overdue > 0 ? 'bg-red-50' : 'bg-cream-100'}`}
         >
-          <p className="text-2xl font-display font-800 text-gray-800">{totalAssigned}</p>
-          <p className="text-xs text-warm-gray font-display font-600">total assigned</p>
+          <p className={`text-2xl font-display font-800 ${overdue > 0 ? 'text-red-500' : 'text-gray-400'}`}>{overdue}</p>
+          <p className="text-xs text-warm-gray font-display font-600">{overdue > 0 ? '⚠️ overdue' : '✓ overdue'}</p>
         </button>
         <button
           onClick={() => setActiveTab('assigned')}

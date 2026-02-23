@@ -281,7 +281,7 @@ function AssignedTaskCard({ task, onEdit }: { task: Task; onEdit: () => void }) 
   );
 }
 
-type AssignedFilter = 'all' | 'to-me' | 'assigned-by-me' | 'unassigned';
+type AssignedFilter = 'all' | 'mine' | 'team' | 'unassigned';
 
 const byPointsDesc = (a: Task, b: Task) => (b.points ?? 0) - (a.points ?? 0);
 
@@ -293,18 +293,16 @@ export default function Assigned() {
   const otherPlayer: Player = activePlayer === 'johnathan' ? 'jordyn' : 'johnathan';
   const otherName = scores[otherPlayer].displayName;
 
-  // Tasks assigned to me (claimed by me or team tasks), not done
-  const toMe = tasks.filter(
-    t => t.status !== 'done' && (t.claimedBy === activePlayer || t.assignedToBoth)
-  );
-
-  // My tasks = tasks I assigned to my partner (not done)
+  // Tasks assigned to me only (claimed by me, not team)
   const myTasks = tasks.filter(
-    t => t.assignedBy === activePlayer && t.status !== 'done'
+    t => t.status !== 'done' && t.claimedBy === activePlayer && !t.assignedToBoth
   );
 
-  // Team tasks
+  // Team tasks (assigned to both)
   const teamTasks = tasks.filter(t => t.assignedToBoth && t.status !== 'done');
+
+  // All tasks relevant to me: mine + team
+  const toMe = [...myTasks, ...teamTasks];
 
   // Unassigned tasks — pending, non-daily, no claimedBy, not team
   const unassignedTasks = tasks.filter(
@@ -312,12 +310,17 @@ export default function Assigned() {
   );
 
   const displayed =
-    filter === 'to-me'          ? toMe :
-    filter === 'assigned-by-me' ? myTasks :
-    filter === 'unassigned'     ? unassignedTasks :
-    [...new Map([...toMe, ...myTasks.filter(t => !t.assignedToBoth && t.claimedBy !== activePlayer), ...teamTasks].map(t => [t.id, t])).values()];
+    filter === 'mine'       ? myTasks :
+    filter === 'team'       ? teamTasks :
+    filter === 'unassigned' ? unassignedTasks :
+    [...new Map([...toMe].map(t => [t.id, t])).values()];
 
-  const hasAny = toMe.length > 0 || myTasks.length > 0 || teamTasks.length > 0 || unassignedTasks.length > 0;
+  const hasAny = toMe.length > 0 || unassignedTasks.length > 0;
+
+  // Team progress stat
+  const totalTasks = tasks.length;
+  const doneTasks = tasks.filter(t => t.status === 'done').length;
+  const teamProgressPct = totalTasks > 0 ? Math.round((doneTasks / totalTasks) * 100) : 0;
 
   // Group displayed tasks by category in TASK_CATEGORIES order
   const allCategories = [...TASK_CATEGORIES, 'Other'];
@@ -353,14 +356,14 @@ export default function Assigned() {
           onClick={() => setFilter('all')}
           className="card text-center min-h-[72px] flex flex-col items-center justify-center active:scale-95 transition-transform"
         >
-          <p className="text-2xl font-display font-800 text-gray-800">{toMe.length + myTasks.filter(t => !t.assignedToBoth && t.claimedBy !== activePlayer).length + teamTasks.length}</p>
-          <p className="text-xs text-warm-gray font-display font-600">total assigned</p>
+          <p className="text-2xl font-display font-800 text-sage-500">{teamProgressPct}%</p>
+          <p className="text-xs text-warm-gray font-display font-600">team progress</p>
         </button>
         <button
-          onClick={() => setFilter('to-me')}
+          onClick={() => setFilter('mine')}
           className="card text-center min-h-[72px] flex flex-col items-center justify-center active:scale-95 transition-transform"
         >
-          <p className="text-2xl font-display font-800 text-rose-medium">{toMe.length}</p>
+          <p className="text-2xl font-display font-800 text-rose-medium">{myTasks.length}</p>
           <p className="text-xs text-warm-gray font-display font-600">my tasks</p>
         </button>
         <button
@@ -376,9 +379,9 @@ export default function Assigned() {
       <div className="overflow-x-auto -mx-4 px-4">
         <div className="flex gap-1.5 min-w-max">
           {([
-            { key: 'all', label: `All (${toMe.length + myTasks.filter(t => !t.assignedToBoth && t.claimedBy !== activePlayer).length + teamTasks.length})` },
-            { key: 'to-me', label: `To me (${toMe.length})` },
-            { key: 'assigned-by-me', label: `Assigned by me (${myTasks.length})` },
+            { key: 'all', label: `All (${toMe.length})` },
+            { key: 'mine', label: `Mine (${myTasks.length})` },
+            { key: 'team', label: `Team (${teamTasks.length})` },
             { key: 'unassigned', label: `Unassigned (${unassignedTasks.length})` },
           ] as { key: AssignedFilter; label: string }[]).map(({ key, label }) => (
             <button

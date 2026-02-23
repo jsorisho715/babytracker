@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { useStore } from '../store/useStore';
-import type { Goal } from '../types';
-import { Plus, Pencil, Trash2, Check, Target, ArrowRightLeft } from 'lucide-react';
+import type { Goal, Player } from '../types';
+import PointsBadge from '../components/PointsBadge';
+import { Plus, Pencil, Trash2, Check, Target, ArrowRightLeft, UserPlus, UserX } from 'lucide-react';
 
 interface GoalFormProps {
   initial?: Partial<Goal>;
@@ -96,9 +97,13 @@ interface GoalCardProps {
 }
 
 function GoalCard({ goal, onEdit }: GoalCardProps) {
-  const { completeGoal, deleteGoal, convertGoalToTask, convertGoalToShopping, scores } = useStore();
+  const { completeGoal, deleteGoal, convertGoalToTask, convertGoalToShopping, assignGoal, assignGoalToBoth, unassignGoal, scores, activePlayer } = useStore();
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [showMove, setShowMove] = useState(false);
+  const [showAssign, setShowAssign] = useState(false);
+  const otherPlayer: Player = activePlayer === 'johnathan' ? 'jordyn' : 'johnathan';
+  const otherName = scores[otherPlayer].displayName;
+  const isAssigned = !!goal.claimedBy || !!goal.assignedToBoth;
 
   const formatDate = (d?: string) => {
     if (!d) return null;
@@ -122,6 +127,17 @@ function GoalCard({ goal, onEdit }: GoalCardProps) {
         <p className={`font-display font-600 text-gray-800 ${goal.completed ? 'line-through opacity-60' : ''}`}>
           {goal.name}
         </p>
+        <div className="flex items-center gap-1.5 flex-wrap mt-1">
+          <PointsBadge points={goal.points} />
+          {goal.assignedToBoth && (
+            <span className="text-xs font-display font-600 text-yellow-600">🤝 Team Luca</span>
+          )}
+          {!goal.assignedToBoth && goal.claimedBy && (
+            <span className={`text-xs font-display font-600 ${goal.claimedBy === 'johnathan' ? 'text-sage-500' : 'text-rose-medium'}`}>
+              📌 {scores[goal.claimedBy].displayName}
+            </span>
+          )}
+        </div>
         {(goal.startDate || goal.endDate) && (
           <p className="text-xs text-warm-gray mt-0.5">
             {goal.startDate && <span>From {formatDate(goal.startDate)} </span>}
@@ -137,6 +153,44 @@ function GoalCard({ goal, onEdit }: GoalCardProps) {
       </div>
 
       <div className="flex items-center gap-1 flex-shrink-0">
+        {/* Assign / Unassign */}
+        {!goal.completed && !isAssigned && (
+          <div className="relative">
+            <button
+              onClick={() => setShowAssign(v => !v)}
+              title="Assign to..."
+              className="w-8 h-8 rounded-xl bg-cream-100 text-warm-gray hover:bg-rose-50 hover:text-rose-medium flex items-center justify-center"
+            >
+              <UserPlus className="w-3.5 h-3.5" />
+            </button>
+            {showAssign && (
+              <div className="absolute right-0 top-9 z-20 bg-white rounded-2xl shadow-md border border-cream-200 min-w-[170px] overflow-hidden">
+                <button
+                  onClick={() => { assignGoal(goal.id, activePlayer); setShowAssign(false); }}
+                  className="w-full text-left px-4 py-2.5 text-xs font-display font-600 text-gray-700 hover:bg-cream-100"
+                >👤 Assign to me</button>
+                <button
+                  onClick={() => { assignGoal(goal.id, otherPlayer); setShowAssign(false); }}
+                  className="w-full text-left px-4 py-2.5 text-xs font-display font-600 text-gray-700 hover:bg-cream-100"
+                >👤 Assign to {otherName}</button>
+                <button
+                  onClick={() => { assignGoalToBoth(goal.id); setShowAssign(false); }}
+                  className="w-full text-left px-4 py-2.5 text-xs font-display font-600 text-yellow-700 hover:bg-yellow-50 border-t border-cream-200"
+                >🤝 Team task (both)</button>
+              </div>
+            )}
+          </div>
+        )}
+        {!goal.completed && isAssigned && (
+          <button
+            onClick={() => unassignGoal(goal.id)}
+            title="Unassign"
+            className="w-8 h-8 rounded-xl bg-cream-100 text-warm-gray hover:bg-red-50 hover:text-red-400 flex items-center justify-center"
+          >
+            <UserX className="w-3.5 h-3.5" />
+          </button>
+        )}
+
         {/* Move to... */}
         {!goal.completed && (
           <div className="relative">
