@@ -283,7 +283,12 @@ function AssignedTaskCard({ task, onEdit }: { task: Task; onEdit: () => void }) 
 
 type AssignedFilter = 'all' | 'mine' | 'team' | 'unassigned';
 
-const byPointsDesc = (a: Task, b: Task) => (b.points ?? 0) - (a.points ?? 0);
+const byPointsDesc = (a: Task, b: Task) => {
+  // Team Luca tasks always go to the bottom
+  if (a.assignedToBoth && !b.assignedToBoth) return 1;
+  if (!a.assignedToBoth && b.assignedToBoth) return -1;
+  return (b.points ?? 0) - (a.points ?? 0);
+};
 
 export default function Assigned() {
   const { tasks, activePlayer, scores, updateTask } = useStore();
