@@ -401,7 +401,11 @@ interface CategoryGroupProps {
   onCancelEdit: () => void;
 }
 
-const byPointsDesc = (a: { points: number }, b: { points: number }) => (b.points ?? 0) - (a.points ?? 0);
+const byPointsDesc = (a: Task, b: Task) => {
+  if (a.assignedToBoth && !b.assignedToBoth) return 1;
+  if (!a.assignedToBoth && b.assignedToBoth) return -1;
+  return (b.points ?? 0) - (a.points ?? 0);
+};
 
 function CategoryGroup({ category, tasks, defaultOpen, onEdit, editId, onCancelEdit }: CategoryGroupProps) {
   const [open, setOpen] = useState(defaultOpen);
