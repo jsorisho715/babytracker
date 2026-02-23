@@ -14,6 +14,7 @@ function GoalForm({ initial, onSave, onCancel }: GoalFormProps) {
   const [startDate, setStartDate] = useState(initial?.startDate ?? '');
   const [endDate, setEndDate] = useState(initial?.endDate ?? '');
   const [notes, setNotes] = useState(initial?.notes ?? '');
+  const [points, setPoints] = useState<5 | 10 | 25 | 50 | 100>(initial?.points ?? 25);
 
   const handleSave = () => {
     if (!name.trim()) return;
@@ -22,6 +23,7 @@ function GoalForm({ initial, onSave, onCancel }: GoalFormProps) {
       startDate: startDate || undefined,
       endDate: endDate || undefined,
       notes: notes.trim() || undefined,
+      points,
       completed: initial?.completed ?? false,
       completedBy: initial?.completedBy,
       completedAt: initial?.completedAt,
@@ -66,6 +68,20 @@ function GoalForm({ initial, onSave, onCancel }: GoalFormProps) {
         placeholder="Notes (optional)"
         className="w-full px-4 py-2.5 bg-cream-100 rounded-xl text-sm font-display font-500 border-none outline-none focus:ring-2 focus:ring-sage-300"
       />
+      <div>
+        <label className="text-xs text-warm-gray font-display font-600 block mb-1">Points</label>
+        <select
+          value={points}
+          onChange={e => setPoints(parseInt(e.target.value) as 5 | 10 | 25 | 50 | 100)}
+          className="w-full px-3 py-2 bg-cream-100 rounded-xl text-sm font-display font-500 border-none outline-none focus:ring-2 focus:ring-sage-300"
+        >
+          <option value={5}>5 pts - Quick win</option>
+          <option value={10}>10 pts - Easy</option>
+          <option value={25}>25 pts - Medium</option>
+          <option value={50}>50 pts - Hard</option>
+          <option value={100}>100 pts - Boss level</option>
+        </select>
+      </div>
       <div className="flex gap-2">
         <button onClick={handleSave} className="btn-primary flex-1 py-2 text-sm">Save</button>
         <button onClick={onCancel} className="btn-secondary flex-1 py-2 text-sm">Cancel</button>

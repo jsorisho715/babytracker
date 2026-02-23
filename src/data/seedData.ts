@@ -112,12 +112,12 @@ export const seedShoppingItems: ShoppingItem[] = [
 ];
 
 export const seedGoals: Goal[] = [
-  { id: 'g1', name: 'Buy a house', completed: false },
-  { id: 'g2', name: 'Budget', completed: false },
-  { id: 'g3', name: 'Read more books on babies', completed: false },
-  { id: 'g4', name: 'Find babysitters', completed: false },
-  { id: 'g5', name: 'How we\'re telling people', completed: false },
-  { id: 'g6', name: 'Time off work', completed: false },
+  { id: 'g1', name: 'Buy a house', completed: false, points: 25 },
+  { id: 'g2', name: 'Budget', completed: false, points: 25 },
+  { id: 'g3', name: 'Read more books on babies', completed: false, points: 10 },
+  { id: 'g4', name: 'Find babysitters', completed: false, points: 10 },
+  { id: 'g5', name: 'How we\'re telling people', completed: false, points: 10 },
+  { id: 'g6', name: 'Time off work', completed: false, points: 10 },
 ];
 
 export const TASK_CATEGORIES = [

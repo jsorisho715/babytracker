@@ -22,6 +22,11 @@ CREATE TABLE IF NOT EXISTS tasks (
 -- ALTER TABLE tasks ADD COLUMN IF NOT EXISTS assigned_by TEXT;
 -- ALTER TABLE tasks ADD COLUMN IF NOT EXISTS is_daily BOOLEAN DEFAULT FALSE;
 -- ALTER TABLE tasks ADD COLUMN IF NOT EXISTS assigned_to_both BOOLEAN DEFAULT FALSE;
+-- ALTER TABLE tasks ADD COLUMN IF NOT EXISTS due_date TEXT;
+-- ALTER TABLE goals ADD COLUMN IF NOT EXISTS points INTEGER DEFAULT 25;
+-- ALTER TABLE goals ADD COLUMN IF NOT EXISTS claimed_by TEXT;
+-- ALTER TABLE goals ADD COLUMN IF NOT EXISTS assigned_by TEXT;
+-- ALTER TABLE goals ADD COLUMN IF NOT EXISTS assigned_to_both BOOLEAN DEFAULT FALSE;
 -- For app_settings: run the CREATE TABLE and policy from above if adding fresh
 
 -- Create shopping_items table
@@ -49,6 +54,10 @@ CREATE TABLE IF NOT EXISTS goals (
   completed BOOLEAN DEFAULT FALSE,
   completed_by TEXT,
   completed_at TEXT,
+  points INTEGER DEFAULT 25,
+  claimed_by TEXT,
+  assigned_by TEXT,
+  assigned_to_both BOOLEAN DEFAULT FALSE,
   created_at TIMESTAMP DEFAULT NOW(),
   updated_at TIMESTAMP DEFAULT NOW()
 );

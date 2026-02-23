@@ -17,6 +17,7 @@ export interface Task {
   completedAt?: string;
   isDaily?: boolean;
   assignedToBoth?: boolean;
+  dueDate?: string;
 }
 
 export interface ShoppingItem {
@@ -40,6 +41,10 @@ export interface Goal {
   completed?: boolean;
   completedBy?: Player;
   completedAt?: string;
+  points: PointTier;
+  claimedBy?: Player;
+  assignedBy?: Player;
+  assignedToBoth?: boolean;
 }
 
 export interface PlayerScore {

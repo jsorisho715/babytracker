@@ -98,6 +98,7 @@ interface AppState {
   toasts: Toast[];
   isLoaded: boolean;
   previousMilestone: number;
+  pendingCategoryFilter: string | null;
 
   // Actions - tasks
   loadSeedData: (force?: boolean) => Promise<void>;
@@ -126,6 +127,9 @@ interface AppState {
   updateGoal: (id: string, updates: Partial<Goal>) => void;
   deleteGoal: (id: string) => void;
   completeGoal: (id: string) => void;
+  assignGoal: (goalId: string, assignTo: Player) => void;
+  assignGoalToBoth: (goalId: string) => void;
+  unassignGoal: (goalId: string) => void;
 
   // Actions - conversions
   convertTaskToShopping: (taskId: string) => void;
@@ -140,6 +144,7 @@ interface AppState {
   incrementConfetti: () => void;
   setActivePlayer: (player: Player) => void;
   setActiveTab: (tab: NavTab) => void;
+  setActiveTabWithCategory: (tab: NavTab, category?: string) => void;
   addToast: (toast: Omit<Toast, 'id'>) => void;
   removeToast: (id: string) => void;
   updateSettings: (settings: Partial<AppSettings>) => void;
@@ -169,6 +174,7 @@ export const useStore = create<AppState>()(
       isLoaded: false,
       previousMilestone: 0,
       confettiTrigger: 0,
+      pendingCategoryFilter: null,
 
       incrementConfetti: () => set(s => ({ confettiTrigger: s.confettiTrigger + 1 })),
 
@@ -208,13 +214,24 @@ export const useStore = create<AppState>()(
                 assignedBy: t.assigned_by ?? undefined,
                 isDaily: t.is_daily ?? false,
                 assignedToBoth: t.assigned_to_both ?? false,
+                dueDate: t.due_date ?? undefined,
               }));
               const shopping = shoppingRes.data?.map((s: any) => ({
                 ...s,
                 points: s.points as any,
                 status: s.status as any
               })) ?? [];
-              const goals = goalsRes.data ?? [];
+              const goals = (goalsRes.data || []).map((g: any) => ({
+                ...g,
+                startDate: g.start_date ?? undefined,
+                endDate: g.end_date ?? undefined,
+                completedBy: g.completed_by ?? undefined,
+                completedAt: g.completed_at ?? undefined,
+                points: g.points ?? 25,
+                claimedBy: g.claimed_by ?? undefined,
+                assignedBy: g.assigned_by ?? undefined,
+                assignedToBoth: g.assigned_to_both ?? false,
+              }));
               const dailyCompletions: DailyCompletion[] = ((completionsRes as any).data ?? []).map((c: any) => ({
                 taskId: c.task_id,
                 player: c.player as Player,
@@ -283,6 +300,7 @@ export const useStore = create<AppState>()(
               completed_at: t.completedAt,
               is_daily: t.isDaily ?? false,
               assigned_to_both: t.assignedToBoth ?? false,
+              due_date: t.dueDate ?? null,
             })) as any),
             supabase.from('shopping_items').upsert(shopping.map(s => ({
               id: s.id,
@@ -303,7 +321,11 @@ export const useStore = create<AppState>()(
               notes: g.notes,
               completed: g.completed,
               completed_by: g.completedBy,
-              completed_at: g.completedAt
+              completed_at: g.completedAt,
+              points: g.points,
+              claimed_by: g.claimedBy,
+              assigned_by: g.assignedBy,
+              assigned_to_both: g.assignedToBoth,
             })) as any),
             supabase.from('player_scores').upsert(Object.values(scores).map(s => ({
               player: s.player,
@@ -403,6 +425,9 @@ export const useStore = create<AppState>()(
                 points: task.points,
                 is_daily: task.isDaily ?? false,
                 assigned_to_both: task.assignedToBoth ?? false,
+                claimed_by: task.claimedBy ?? null,
+                assigned_by: task.assignedBy ?? null,
+                due_date: task.dueDate ?? null,
               } as any);
             } catch (err: any) { console.error('Supabase addTask:', err); }
           })();
@@ -444,6 +469,7 @@ export const useStore = create<AppState>()(
                   completed_at: updated.completedAt ?? null,
                   is_daily: updated.isDaily ?? false,
                   assigned_to_both: updated.assignedToBoth ?? false,
+                  due_date: updated.dueDate ?? null,
                 }).eq('id', id);
               } catch (err: any) { console.error('Supabase updateTask:', err); }
             })();
@@ -999,7 +1025,7 @@ export const useStore = create<AppState>()(
       },
 
       addGoal: (goalData) => {
-        const goal: Goal = { ...goalData, id: generateId() };
+        const goal: Goal = { ...goalData, id: generateId(), points: goalData.points ?? 25 };
         set(s => ({ goals: [...s.goals, goal] }));
         if (SUPABASE_ENABLED) {
           (async () => {
@@ -1011,6 +1037,10 @@ export const useStore = create<AppState>()(
                 start_date: goal.startDate ?? null,
                 end_date: goal.endDate ?? null,
                 completed: goal.completed ?? false,
+                points: goal.points,
+                claimed_by: goal.claimedBy ?? null,
+                assigned_by: goal.assignedBy ?? null,
+                assigned_to_both: goal.assignedToBoth ?? false,
               } as any);
             } catch (err: any) { console.error('Supabase addGoal:', err); }
           })();
@@ -1032,6 +1062,10 @@ export const useStore = create<AppState>()(
                 completed: updated.completed ?? false,
                 completed_by: updated.completedBy ?? null,
                 completed_at: updated.completedAt ?? null,
+                points: updated.points,
+                claimed_by: updated.claimedBy ?? null,
+                assigned_by: updated.assignedBy ?? null,
+                assigned_to_both: updated.assignedToBoth ?? false,
               } as any).eq('id', id);
             } catch (err: any) { console.error('Supabase updateGoal:', err); }
           })();
@@ -1050,25 +1084,104 @@ export const useStore = create<AppState>()(
       },
 
       completeGoal: (id) => {
-        const { activePlayer } = get();
+        const { activePlayer, scores, goals } = get();
+        const goal = goals.find(g => g.id === id);
+        if (!goal) return;
+        
         const now = new Date().toISOString();
-        const existing = get().goals.find(g => g.id === id);
-        const newCompleted = !existing?.completed;
-        set(s => ({
-          goals: s.goals.map(g =>
-            g.id === id ? { ...g, completed: newCompleted, completedBy: activePlayer, completedAt: now } : g
-          ),
-        }));
-        if (SUPABASE_ENABLED) {
-          (async () => {
-            try {
-              await supabase.from('goals').update({
-                completed: newCompleted,
-                completed_by: activePlayer,
-                completed_at: now,
-              } as any).eq('id', id);
-            } catch (err: any) { console.error('Supabase completeGoal:', err); }
-          })();
+        const newCompleted = !goal.completed;
+        
+        if (newCompleted) {
+          // Award points
+          const newPoints = scores[activePlayer].totalPoints + goal.points;
+          const newScore: PlayerScore = {
+            ...scores[activePlayer],
+            totalPoints: newPoints,
+            tasksCompleted: scores[activePlayer].tasksCompleted + 1,
+          };
+          const updatedScores = { ...scores, [activePlayer]: newScore };
+          const newBadges = checkAndAwardBadges(activePlayer, get().tasks, get().shopping, updatedScores);
+          newScore.badges = [...newScore.badges, ...newBadges.map(b => ({ ...b, unlockedAt: now }))];
+          
+          set(s => ({
+            goals: s.goals.map(g =>
+              g.id === id ? { ...g, completed: newCompleted, completedBy: activePlayer, completedAt: now } : g
+            ),
+            scores: updatedScores,
+          }));
+          
+          if (SUPABASE_ENABLED) {
+            (async () => {
+              try {
+                await supabase.from('goals').update({
+                  completed: newCompleted,
+                  completed_by: activePlayer,
+                  completed_at: now,
+                } as any).eq('id', id);
+                await supabase.from('player_scores').update({
+                  total_points: newScore.totalPoints,
+                  tasks_completed: newScore.tasksCompleted,
+                }).eq('player', activePlayer);
+              } catch (err: any) { console.error('Supabase completeGoal:', err); }
+            })();
+          }
+          
+          get().addToast({
+            message: `Goal completed! +${goal.points} pts`,
+            type: 'success',
+            points: goal.points,
+            player: activePlayer,
+            taskId: id,
+            canUndo: true,
+          });
+          
+          if (newBadges.length > 0) {
+            get().addToast({
+              message: `${newBadges[0].emoji} Badge unlocked: ${newBadges[0].name}!`,
+              type: 'info',
+            });
+          }
+          get().incrementConfetti();
+        } else {
+          // Uncomplete: deduct points
+          const { completedBy } = goal;
+          if (completedBy) {
+            const newPoints = Math.max(0, scores[completedBy].totalPoints - goal.points);
+            const newScore: PlayerScore = {
+              ...scores[completedBy],
+              totalPoints: newPoints,
+              tasksCompleted: Math.max(0, scores[completedBy].tasksCompleted - 1),
+            };
+            const updatedScores = { ...scores, [completedBy]: newScore };
+            
+            set(s => ({
+              goals: s.goals.map(g =>
+                g.id === id ? { ...g, completed: false, completedBy: undefined, completedAt: undefined } : g
+              ),
+              scores: updatedScores,
+            }));
+            
+            if (SUPABASE_ENABLED) {
+              (async () => {
+                try {
+                  await supabase.from('goals').update({
+                    completed: false,
+                    completed_by: null,
+                    completed_at: null,
+                  } as any).eq('id', id);
+                  await supabase.from('player_scores').update({
+                    total_points: newScore.totalPoints,
+                    tasks_completed: newScore.tasksCompleted,
+                  }).eq('player', completedBy);
+                } catch (err: any) { console.error('Supabase uncompleteGoal:', err); }
+              })();
+            }
+            
+            get().addToast({
+              message: `Goal uncompleted. -${goal.points} pts`,
+              type: 'info',
+            });
+          }
         }
       },
 
@@ -1097,6 +1210,67 @@ export const useStore = create<AppState>()(
         get().addToast({ message: `Moved to Shopping list`, type: 'info' });
       },
 
+      assignGoal: (goalId, assignTo) => {
+        const { activePlayer } = get();
+        set(s => ({
+          goals: s.goals.map(g =>
+            g.id === goalId ? { ...g, claimedBy: assignTo, assignedBy: activePlayer, assignedToBoth: false } : g
+          ),
+        }));
+        if (SUPABASE_ENABLED) {
+          (async () => {
+            try {
+              await supabase.from('goals').update({
+                claimed_by: assignTo,
+                assigned_by: activePlayer,
+                assigned_to_both: false,
+              } as any).eq('id', goalId);
+            } catch (err: any) { console.error('Supabase assignGoal:', err); }
+          })();
+        }
+        get().addToast({ message: `Goal assigned to ${assignTo}`, type: 'info' });
+      },
+
+      assignGoalToBoth: (goalId) => {
+        set(s => ({
+          goals: s.goals.map(g =>
+            g.id === goalId ? { ...g, claimedBy: undefined, assignedBy: undefined, assignedToBoth: true } : g
+          ),
+        }));
+        if (SUPABASE_ENABLED) {
+          (async () => {
+            try {
+              await supabase.from('goals').update({
+                claimed_by: null,
+                assigned_by: null,
+                assigned_to_both: true,
+              } as any).eq('id', goalId);
+            } catch (err: any) { console.error('Supabase assignGoalToBoth:', err); }
+          })();
+        }
+        get().addToast({ message: `Goal assigned to Team Luca`, type: 'info' });
+      },
+
+      unassignGoal: (goalId) => {
+        set(s => ({
+          goals: s.goals.map(g =>
+            g.id === goalId ? { ...g, claimedBy: undefined, assignedBy: undefined, assignedToBoth: false } : g
+          ),
+        }));
+        if (SUPABASE_ENABLED) {
+          (async () => {
+            try {
+              await supabase.from('goals').update({
+                claimed_by: null,
+                assigned_by: null,
+                assigned_to_both: false,
+              } as any).eq('id', goalId);
+            } catch (err: any) { console.error('Supabase unassignGoal:', err); }
+          })();
+        }
+        get().addToast({ message: `Goal unassigned`, type: 'info' });
+      },
+
       convertTaskToGoal: (taskId) => {
         const task = get().tasks.find(t => t.id === taskId);
         if (!task) return;
@@ -1105,6 +1279,7 @@ export const useStore = create<AppState>()(
           name: task.task,
           notes: task.notes,
           completed: false,
+          points: task.points,
         };
         set(s => ({
           tasks: s.tasks.filter(t => t.id !== taskId),
@@ -1114,7 +1289,7 @@ export const useStore = create<AppState>()(
           (async () => {
             try {
               await supabase.from('tasks').delete().eq('id', taskId);
-              await supabase.from('goals').insert({ id: newGoal.id, name: newGoal.name, notes: newGoal.notes, completed: false });
+              await supabase.from('goals').insert({ id: newGoal.id, name: newGoal.name, notes: newGoal.notes, completed: false, points: newGoal.points });
             } catch (err: any) { console.error('Supabase sync error:', err); }
           })();
         }
@@ -1157,6 +1332,7 @@ export const useStore = create<AppState>()(
           name: item.name,
           notes: item.notes,
           completed: false,
+          points: item.points,
         };
         set(s => ({
           shopping: s.shopping.filter(i => i.id !== itemId),
@@ -1166,7 +1342,7 @@ export const useStore = create<AppState>()(
           (async () => {
             try {
               await supabase.from('shopping_items').delete().eq('id', itemId);
-              await supabase.from('goals').insert({ id: newGoal.id, name: newGoal.name, notes: newGoal.notes, completed: false });
+              await supabase.from('goals').insert({ id: newGoal.id, name: newGoal.name, notes: newGoal.notes, completed: false, points: newGoal.points });
             } catch (err: any) { console.error('Supabase sync error:', err); }
           })();
         }
@@ -1184,7 +1360,7 @@ export const useStore = create<AppState>()(
           timing: goal.endDate ?? 'ASAP',
           status: 'pending',
           notes: goal.notes,
-          points: 25,
+          points: goal.points,
         };
         set(s => ({
           goals: s.goals.filter(g => g.id !== goalId),
@@ -1208,7 +1384,7 @@ export const useStore = create<AppState>()(
           id: generateId(),
           name: goal.name,
           notes: goal.notes,
-          points: 10,
+          points: goal.points,
           status: 'Need to Purchase',
         };
         set(s => ({
@@ -1228,6 +1404,7 @@ export const useStore = create<AppState>()(
 
       setActivePlayer: (player) => set({ activePlayer: player }),
       setActiveTab: (tab) => set({ activeTab: tab }),
+      setActiveTabWithCategory: (tab, category) => set({ activeTab: tab, pendingCategoryFilter: category ?? null }),
 
       addToast: (toast) => {
         const id = generateId();
