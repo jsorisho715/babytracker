@@ -3,7 +3,7 @@ import { useStore } from '../store/useStore';
 import type { Task, PointTier, Player } from '../types';
 import { CATEGORY_EMOJIS, TASK_CATEGORIES } from '../data/seedData';
 import PointsBadge from '../components/PointsBadge';
-import { Plus, Pencil, Trash2, Check, ChevronDown, ChevronUp, Flag, UserPlus, ArrowRightLeft, UserX, Calendar } from 'lucide-react';
+import { Plus, Pencil, Trash2, Check, ChevronDown, ChevronUp, Flag, UserPlus, ArrowRightLeft, UserX, Calendar, Search, X } from 'lucide-react';
 
 type Filter = 'all' | 'pending' | 'claimed' | 'done' | 'unassigned';
 
@@ -458,6 +458,7 @@ export default function Tasks() {
   const [editId, setEditId] = useState<string | null>(null);
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [dailyOnly, setDailyOnly] = useState(false);
+  const [search, setSearch] = useState('');
 
   // When navigating from Dashboard category progress, apply that category filter
   useEffect(() => {
@@ -470,7 +471,10 @@ export default function Tasks() {
     }
   }, [pendingCategoryFilter, setActiveTabWithCategory]);
 
+  const searchLower = search.toLowerCase();
   const filtered = tasks.filter(t => {
+    const searchMatch = !search || t.task.toLowerCase().includes(searchLower) || (t.notes ?? '').toLowerCase().includes(searchLower);
+    if (!searchMatch) return false;
     if (filter === 'unassigned') return !t.claimedBy && !t.assignedToBoth && t.status !== 'done' && !t.isDaily;
     const statusMatch = filter === 'all' || t.status === filter;
     const catMatch = categoryFilter === 'all' || t.category === categoryFilter;
@@ -510,34 +514,57 @@ export default function Tasks() {
         </div>
       </div>
 
-      {/* Filters + Add button */}
+      {/* Search + Add */}
       <div className="flex items-center gap-2">
-        <div className="flex gap-1.5 overflow-x-auto pb-0.5 -mx-1 px-1 flex-1">
-          {([
-            { key: 'all', label: `All (${counts.all})` },
-            { key: 'pending', label: `Pending (${counts.pending})` },
-            { key: 'claimed', label: `In Progress (${counts.claimed})` },
-            { key: 'done', label: `Done (${counts.done})` },
-            { key: 'unassigned', label: `Unassigned (${counts.unassigned})` },
-          ] as { key: Filter; label: string }[]).map(({ key, label }) => (
-            <button
-              key={key}
-              onClick={() => { setFilter(key); if (key === 'unassigned') { setCategoryFilter('all'); setDailyOnly(false); } }}
-              className={`category-chip whitespace-nowrap flex-shrink-0 ${filter === key ? 'category-chip-active' : ''}`}
-            >
-              {label}
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-warm-gray pointer-events-none" />
+          <input
+            type="text"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Search tasks…"
+            className="w-full pl-9 pr-8 py-2.5 bg-cream-100 rounded-xl text-sm font-display font-500 border-none outline-none focus:ring-2 focus:ring-sage-300"
+          />
+          {search && (
+            <button onClick={() => setSearch('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-warm-gray">
+              <X className="w-3.5 h-3.5" />
             </button>
-          ))}
+          )}
         </div>
         <button
           onClick={() => { setShowAdd(true); setEditId(null); }}
-          className="btn-primary py-2 px-4 text-sm flex items-center gap-1.5 flex-shrink-0"
+          className="btn-primary h-10 w-10 rounded-xl flex items-center justify-center flex-shrink-0 p-0"
+          title="Add task"
         >
-          <Plus className="w-4 h-4" /> Add
+          <Plus className="w-5 h-5" />
         </button>
       </div>
 
-      {/* Category + Daily filter chips */}
+      {/* Status filter chips — full width scrollable */}
+      <div className="flex gap-1.5 overflow-x-auto pb-0.5 -mx-4 px-4">
+        {([
+          { key: 'all', label: `All`, count: counts.all },
+          { key: 'pending', label: `Pending`, count: counts.pending },
+          { key: 'claimed', label: `In Progress`, count: counts.claimed },
+          { key: 'done', label: `Done`, count: counts.done },
+          { key: 'unassigned', label: `Unassigned`, count: counts.unassigned },
+        ] as { key: Filter; label: string; count: number }[]).map(({ key, label, count }) => (
+          <button
+            key={key}
+            onClick={() => { setFilter(key); if (key === 'unassigned') { setCategoryFilter('all'); setDailyOnly(false); } }}
+            className={`flex items-center gap-1.5 whitespace-nowrap flex-shrink-0 px-3 py-1.5 rounded-xl text-xs font-display font-700 transition-colors ${
+              filter === key ? 'bg-sage-400 text-white' : 'bg-cream-200 text-warm-gray hover:bg-cream-300'
+            }`}
+          >
+            {label}
+            <span className={`text-[10px] font-800 px-1.5 py-0.5 rounded-full ${filter === key ? 'bg-white/25 text-white' : 'bg-cream-300 text-warm-gray'}`}>
+              {count}
+            </span>
+          </button>
+        ))}
+      </div>
+
+      {/* Category filter chips — hidden when Unassigned filter active */}
       {filter !== 'unassigned' && (
         <div className="flex gap-1.5 overflow-x-auto pb-0.5 -mx-4 px-4">
           <button

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useStore } from '../store/useStore';
 import type { Task, PointTier, Player } from '../types';
 import PointsBadge from '../components/PointsBadge';
-import { Check, ChevronDown, ChevronUp, Pencil, Trash2, UserX, ArrowRightLeft, ClipboardList } from 'lucide-react';
+import { Check, ChevronDown, ChevronUp, Pencil, Trash2, UserX, ArrowRightLeft, ClipboardList, Search, X } from 'lucide-react';
 import { CATEGORY_EMOJIS, TASK_CATEGORIES } from '../data/seedData';
 
 const PRIORITY_DOT: Record<string, string> = {
@@ -294,6 +294,7 @@ export default function Assigned() {
   const { tasks, activePlayer, scores, updateTask } = useStore();
   const [editId, setEditId] = useState<string | null>(null);
   const [filter, setFilter] = useState<AssignedFilter>('all');
+  const [search, setSearch] = useState('');
 
   const otherPlayer: Player = activePlayer === 'johnathan' ? 'jordyn' : 'johnathan';
   const otherName = scores[otherPlayer].displayName;
@@ -314,11 +315,16 @@ export default function Assigned() {
     t => t.status !== 'done' && !t.isDaily && !t.claimedBy && !t.assignedToBoth
   );
 
-  const displayed =
+  const searchLower = search.toLowerCase();
+  const applySearch = (list: Task[]) =>
+    !search ? list : list.filter(t => t.task.toLowerCase().includes(searchLower) || (t.notes ?? '').toLowerCase().includes(searchLower));
+
+  const displayed = applySearch(
     filter === 'mine'       ? myTasks :
     filter === 'team'       ? teamTasks :
     filter === 'unassigned' ? unassignedTasks :
-    [...new Map([...toMe].map(t => [t.id, t])).values()];
+    [...new Map([...toMe].map(t => [t.id, t])).values()]
+  );
 
   const hasAny = toMe.length > 0 || unassignedTasks.length > 0;
 
@@ -378,6 +384,23 @@ export default function Assigned() {
           <p className="text-2xl font-display font-800 text-orange-500">{unassignedTasks.length}</p>
           <p className="text-xs text-warm-gray font-display font-600">unassigned</p>
         </button>
+      </div>
+
+      {/* Search */}
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-warm-gray pointer-events-none" />
+        <input
+          type="text"
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          placeholder="Search assigned tasks…"
+          className="w-full pl-9 pr-9 py-2.5 bg-cream-100 rounded-xl text-sm font-display font-500 border-none outline-none focus:ring-2 focus:ring-sage-300"
+        />
+        {search && (
+          <button onClick={() => setSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-warm-gray hover:text-gray-600">
+            <X className="w-4 h-4" />
+          </button>
+        )}
       </div>
 
       {/* Filter tabs — horizontally scrollable on mobile */}
