@@ -23,7 +23,8 @@ function formatTime(iso: string): string {
 type LaborPhase = 'none' | 'early' | 'active' | 'transition';
 
 function getLaborPhase(avgFreqSec: number | null, avgDurSec: number | null): LaborPhase {
-  if (avgFreqSec === null || avgDurSec === null) return 'none';
+  if (avgDurSec === null) return 'none';
+  if (avgFreqSec === null) return avgDurSec >= 20 ? 'early' : 'none';
   if (avgFreqSec < 180 && avgDurSec >= 60) return 'transition';
   if (avgFreqSec <= 300 && avgDurSec >= 45) return 'active';
   if (avgDurSec >= 20) return 'early';
