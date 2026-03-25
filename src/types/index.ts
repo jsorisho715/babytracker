@@ -88,5 +88,19 @@ export interface DailyCompletion {
   completedAt?: string;
 }
 
-export type NavTab = 'dashboard' | 'tasks' | 'shopping' | 'goals' | 'assigned';
+export interface Contraction {
+  id: string;
+  startTime: string;
+  endTime?: string;
+  duration?: number;
+  notes?: string;
+}
+
+export interface ContractionSettings {
+  alertFrequencyMin: number;
+  alertDurationMin: number;
+  alertWindowMin: number;
+}
+
+export type NavTab = 'dashboard' | 'tasks' | 'shopping' | 'goals' | 'assigned' | 'contractions';
 export type ItemType = 'task' | 'shopping' | 'goal';

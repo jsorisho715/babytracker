@@ -204,7 +204,7 @@ export default function Shopping() {
   const filtered =
     filter === 'need' ? needItems :
     filter === 'purchased' ? purchasedItems :
-    [...needItems, ...purchasedItems];
+    [...shopping].sort(byPointsDesc);
 
   const needCount = shopping.filter(s => s.status === 'Need to Purchase').length;
   const purchasedCount = shopping.filter(s => s.status === 'Purchased').length;

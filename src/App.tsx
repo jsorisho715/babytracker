@@ -12,6 +12,7 @@ import Tasks from './pages/Tasks';
 import Shopping from './pages/Shopping';
 import Goals from './pages/Goals';
 import Assigned from './pages/Assigned';
+import Contractions from './pages/Contractions';
 import { Settings } from 'lucide-react';
 import { useState } from 'react';
 import SettingsModal from './components/SettingsModal';
@@ -59,6 +60,7 @@ function Header() {
     shopping: 'Shopping',
     goals: 'Goals & Ideas',
     assigned: 'Assigned Tasks',
+    contractions: 'Contractions',
   };
 
   return (
@@ -155,6 +157,7 @@ export default function App() {
       {activeTab === 'shopping' && <Shopping />}
       {activeTab === 'goals' && <Goals />}
       {activeTab === 'assigned' && <Assigned />}
+      {activeTab === 'contractions' && <Contractions />}
     </main>
   );
 

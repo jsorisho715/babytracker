@@ -1,19 +1,30 @@
 import { useState } from 'react';
 import { useStore } from '../store/useStore';
-import { X, AlertTriangle } from 'lucide-react';
+import { X, AlertTriangle, Download } from 'lucide-react';
+import { exportToExcel } from '../utils/exportExcel';
 
 interface Props {
   onClose: () => void;
 }
 
 export default function SettingsModal({ onClose }: Props) {
-  const { settings, updateSettings, loadSeedData, resetToSeed, resetScores } = useStore();
+  const { tasks, shopping, goals, scores, settings, updateSettings, loadSeedData, resetToSeed, resetScores } = useStore();
   const [babyName, setBabyName] = useState(settings.babyName);
   const [dueDate, setDueDate] = useState(settings.dueDate ?? '');
   const [confirmReset, setConfirmReset] = useState(false);
   const [confirmResetScores, setConfirmResetScores] = useState(false);
   const [resetting, setResetting] = useState(false);
   const [resettingScores, setResettingScores] = useState(false);
+  const [exporting, setExporting] = useState(false);
+
+  const handleExport = async () => {
+    setExporting(true);
+    try {
+      await exportToExcel({ tasks, shopping, goals, scores, settings });
+    } finally {
+      setExporting(false);
+    }
+  };
 
   const handleSave = () => {
     updateSettings({ babyName: babyName.trim() || 'Luca', dueDate: dueDate || undefined });
@@ -87,6 +98,14 @@ export default function SettingsModal({ onClose }: Props) {
             className="w-full text-left text-sm font-display font-600 text-sage-600 bg-sage-50 hover:bg-sage-100 rounded-xl px-4 py-2.5 transition-colors"
           >
             Re-import checklist from Excel data
+          </button>
+          <button
+            onClick={handleExport}
+            disabled={exporting}
+            className="w-full flex items-center gap-2 text-sm font-display font-600 text-sage-600 bg-sage-50 hover:bg-sage-100 rounded-xl px-4 py-2.5 transition-colors disabled:opacity-60"
+          >
+            <Download className="w-4 h-4" />
+            {exporting ? 'Exporting…' : 'Export to Excel'}
           </button>
           {!confirmResetScores ? (
             <button

@@ -109,7 +109,18 @@ CREATE TABLE IF NOT EXISTS badges (
   created_at TIMESTAMP DEFAULT NOW()
 );
 
+-- Create contractions table
+CREATE TABLE IF NOT EXISTS contractions (
+  id TEXT PRIMARY KEY,
+  start_time TEXT NOT NULL,
+  end_time TEXT,
+  duration_seconds INTEGER,
+  notes TEXT,
+  created_at TIMESTAMP DEFAULT NOW()
+);
+
 -- Enable RLS (Row Level Security)
+ALTER TABLE contractions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE app_settings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE tasks ENABLE ROW LEVEL SECURITY;
 ALTER TABLE shopping_items ENABLE ROW LEVEL SECURITY;
@@ -126,6 +137,7 @@ CREATE POLICY "Allow all" ON goals FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Allow all" ON player_scores FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Allow all" ON badges FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Allow all" ON daily_completions FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow all" ON contractions FOR ALL USING (true) WITH CHECK (true);
 
 -- Initialize player scores
 INSERT INTO player_scores (player, display_name) VALUES ('johnathan', 'Johnathan')

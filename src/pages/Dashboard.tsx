@@ -6,16 +6,17 @@ import PointsBadge from '../components/PointsBadge';
 import { Trophy, Flame, Star, ChevronRight, ClipboardList, RefreshCw, CheckSquare, ShoppingCart, Target, CheckCircle2, UserX } from 'lucide-react';
 
 function PlayerCard({ player }: { player: Player }) {
-  const { scores, tasks, shopping } = useStore();
+  const { scores, tasks, shopping, goals } = useStore();
   const score = scores[player];
   const isSage = player === 'johnathan';
   if (!score) return null;
 
   const total =
     tasks.filter(t => t.completedBy === player && t.status === 'done').length +
-    shopping.filter(s => s.purchasedBy === player && s.status === 'Purchased').length;
+    shopping.filter(s => s.purchasedBy === player && s.status === 'Purchased').length +
+    goals.filter(g => g.completedBy === player && g.completed).length;
 
-  const totalPossible = tasks.length + shopping.length;
+  const totalPossible = tasks.filter(t => !t.isDaily).length + shopping.length + goals.length;
   const pct = totalPossible ? Math.round((total / totalPossible) * 100) : 0;
 
   return (
@@ -75,9 +76,10 @@ function CategoryProgress() {
       <h3 className="font-display font-700 text-gray-800 mb-3">Progress by Category</h3>
       <div className="space-y-2.5">
         {categories.map(cat => {
-          const catTasks = tasks.filter(t => t.category === cat);
+          const catTasks = tasks.filter(t => t.category === cat && !t.isDaily);
           const done = catTasks.filter(t => t.status === 'done').length;
           const pct = catTasks.length > 0 ? Math.round((done / catTasks.length) * 100) : 0;
+          if (catTasks.length === 0) return null;
           const emoji = CATEGORY_EMOJIS[cat] ?? '📋';
           return (
             <button
@@ -122,7 +124,7 @@ function AssignedCard() {
     ).sort(byPointsDesc);
     const byMe = tasks.filter(t => t.assignedBy === activePlayer && t.status !== 'done');
     const overdue = tasks.filter(
-      t => t.status !== 'done' && t.dueDate && t.dueDate < today
+      t => t.status !== 'done' && t.dueDate && t.dueDate < today && (t.claimedBy === activePlayer || t.assignedToBoth)
     ).length;
     return { toMe, byMe, overdue };
   }, [tasks, activePlayer, today]);
@@ -388,9 +390,10 @@ function DailySection() {
 }
 
 export default function Dashboard() {
-  const { tasks, shopping, scores, settings, isLoaded, loadSeedData } = useStore();
-  const totalDone = tasks.filter(t => t.status === 'done').length + shopping.filter(s => s.status === 'Purchased').length;
-  const totalItems = tasks.length + shopping.length;
+  const { tasks, shopping, goals, scores, settings, isLoaded, loadSeedData } = useStore();
+  const nonDailyTasks = tasks.filter(t => !t.isDaily);
+  const totalDone = nonDailyTasks.filter(t => t.status === 'done').length + shopping.filter(s => s.status === 'Purchased').length + goals.filter(g => g.completed).length;
+  const totalItems = nonDailyTasks.length + shopping.length + goals.length;
   const johnPts = scores.johnathan?.totalPoints ?? 0;
   const jordynPts = scores.jordyn?.totalPoints ?? 0;
   const totalPoints = johnPts + jordynPts;

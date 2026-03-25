@@ -1,7 +1,8 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type {
-  Task, ShoppingItem, Goal, Player, PlayerScore, AppSettings, Toast, NavTab, Badge, DailyCompletion
+  Task, ShoppingItem, Goal, Player, PlayerScore, AppSettings, Toast, NavTab, Badge, DailyCompletion,
+  Contraction, ContractionSettings,
 } from '../types';
 import { seedTasks, seedShoppingItems, seedGoals, MILESTONE_MESSAGES } from '../data/seedData';
 import { supabase } from '../lib/supabase';
@@ -30,6 +31,12 @@ const DEFAULT_SCORES: Record<Player, PlayerScore> = {
 const DEFAULT_SETTINGS: AppSettings = {
   babyName: 'Luca',
   dueDate: undefined,
+};
+
+const DEFAULT_CONTRACTION_SETTINGS: ContractionSettings = {
+  alertFrequencyMin: 5,
+  alertDurationMin: 1,
+  alertWindowMin: 60,
 };
 
 const BADGES_CATALOG: Badge[] = [
@@ -139,6 +146,15 @@ interface AppState {
   convertGoalToTask: (goalId: string) => void;
   convertGoalToShopping: (goalId: string) => void;
 
+  // Contractions
+  contractions: Contraction[];
+  contractionSettings: ContractionSettings;
+  startContraction: () => void;
+  stopContraction: () => void;
+  deleteContraction: (id: string) => void;
+  clearContractions: () => void;
+  updateContractionSettings: (updates: Partial<ContractionSettings>) => void;
+
   // UI
   confettiTrigger: number;
   incrementConfetti: () => void;
@@ -153,6 +169,25 @@ interface AppState {
 
 function generateId() {
   return Math.random().toString(36).slice(2, 10);
+}
+
+function syncBadgesToSupabase(player: Player, newBadges: Badge[]) {
+  if (!SUPABASE_ENABLED || newBadges.length === 0) return;
+  (async () => {
+    try {
+      await supabase.from('badges').upsert(
+        newBadges.map(b => ({
+          id: `${player}-${b.id}`,
+          player,
+          badge_id: b.id,
+          badge_name: b.name,
+          emoji: b.emoji,
+          description: b.description,
+          unlocked_at: b.unlockedAt ?? new Date().toISOString(),
+        })) as any
+      );
+    } catch (err) { console.error('Supabase badge sync:', err); }
+  })();
 }
 
 function getTotalPoints(scores: Record<Player, PlayerScore>) {
@@ -173,6 +208,8 @@ export const useStore = create<AppState>()(
       toasts: [],
       isLoaded: false,
       previousMilestone: 0,
+      contractions: [],
+      contractionSettings: DEFAULT_CONTRACTION_SETTINGS,
       confettiTrigger: 0,
       pendingCategoryFilter: null,
 
@@ -188,14 +225,18 @@ export const useStore = create<AppState>()(
           const fetchDailyCompletions = (): Promise<{ data: any[] }> =>
             (supabase.from('daily_completions').select('*') as any).then((r: any) => r).catch(() => ({ data: [] as any[] }));
 
+          const fetchBadges = (): Promise<{ data: any[] }> =>
+            (supabase.from('badges').select('*') as any).then((r: any) => r).catch(() => ({ data: [] as any[] }));
+
           return Promise.all([
             supabase.from('tasks').select('*'),
             supabase.from('shopping_items').select('*'),
             supabase.from('goals').select('*'),
             fetchDailyCompletions(),
             supabase.from('player_scores').select('*'),
-            supabase.from('app_settings').select('*').eq('id', 'default').maybeSingle()
-          ]).then(([tasksRes, shoppingRes, goalsRes, completionsRes, scoresRes, settingsRes]: any[]) => {
+            supabase.from('app_settings').select('*').eq('id', 'default').maybeSingle(),
+            fetchBadges(),
+          ]).then(([tasksRes, shoppingRes, goalsRes, completionsRes, scoresRes, settingsRes, badgesRes]: any[]) => {
             const settingsRow = settingsRes.data;
             const settings = settingsRow ? {
               babyName: settingsRow.baby_name ?? 'Luca',
@@ -239,21 +280,25 @@ export const useStore = create<AppState>()(
                 completedAt: c.completed_at,
               }));
               const playerScores = scoresRes.data ?? [];
-              
-              const mapScore = (raw: any, defaultVal: PlayerScore): PlayerScore => ({
-                ...defaultVal,
-                ...raw,
+              const allBadges: any[] = (badgesRes as any).data ?? [];
+              const badgesByPlayer = (p: Player): Badge[] =>
+                allBadges
+                  .filter((b: any) => b.player === p)
+                  .map((b: any) => ({ id: b.badge_id, name: b.badge_name, emoji: b.emoji, description: b.description ?? '', unlockedAt: b.unlocked_at }));
+
+              const mapScore = (raw: any, defaultVal: PlayerScore, player: Player): PlayerScore => ({
+                player: defaultVal.player,
+                displayName: raw?.display_name ?? defaultVal.displayName,
                 totalPoints: raw?.total_points ?? defaultVal.totalPoints,
                 tasksCompleted: raw?.tasks_completed ?? defaultVal.tasksCompleted,
                 streakDays: raw?.streak_days ?? defaultVal.streakDays,
                 lastCompletedDate: raw?.last_completed_date ?? defaultVal.lastCompletedDate,
-                displayName: raw?.display_name ?? defaultVal.displayName,
-                badges: defaultVal.badges,
+                badges: badgesByPlayer(player).length > 0 ? badgesByPlayer(player) : defaultVal.badges,
               });
 
               const scores: Record<Player, PlayerScore> = {
-                johnathan: mapScore(playerScores.find((s: any) => s.player === 'johnathan'), DEFAULT_SCORES.johnathan),
-                jordyn: mapScore(playerScores.find((s: any) => s.player === 'jordyn'), DEFAULT_SCORES.jordyn),
+                johnathan: mapScore(playerScores.find((s: any) => s.player === 'johnathan'), DEFAULT_SCORES.johnathan, 'johnathan'),
+                jordyn: mapScore(playerScores.find((s: any) => s.player === 'jordyn'), DEFAULT_SCORES.jordyn, 'jordyn'),
               };
 
               set({ tasks, shopping, goals, dailyCompletions, scores, settings, isLoaded: true });
@@ -262,8 +307,8 @@ export const useStore = create<AppState>()(
               set({ tasks: seedTasks, shopping: seedShoppingItems, goals: seedGoals, dailyCompletions: [], settings, isLoaded: true });
               get().syncToSupabase();
             }
-          }).catch(() => {
-            // Fallback: keep existing state but mark as loaded so the app doesn't blank out
+          }).catch((err) => {
+            console.error('[BabyTracker] Supabase load failed, falling back to local data:', err);
             const existing = get();
             if (existing.tasks.length > 0) {
               set({ isLoaded: true });
@@ -478,6 +523,14 @@ export const useStore = create<AppState>()(
                   assigned_to_both: updated.assignedToBoth ?? false,
                   due_date: updated.dueDate ?? null,
                 }).eq('id', id);
+                if (result.scores) {
+                  const player = original!.completedBy!;
+                  const sc = result.scores[player];
+                  await supabase.from('player_scores').update({
+                    total_points: sc.totalPoints,
+                    tasks_completed: sc.tasksCompleted,
+                  }).eq('player', player);
+                }
               } catch (err: any) { console.error('Supabase updateTask:', err); }
             })();
           }
@@ -696,6 +749,7 @@ export const useStore = create<AppState>()(
           });
           if (newBadges.length > 0) {
             get().addToast({ message: `${newBadges[0].emoji} Badge unlocked: ${newBadges[0].name}!`, type: 'info' });
+            syncBadgesToSupabase(activePlayer, newBadges);
           }
           if (nextMilestone) get().addToast({ message: nextMilestone.message, type: 'info' });
           if (streakBonus > 0) get().addToast({ message: `🔥 3-day streak! +${streakBonus} bonus pts`, type: 'info' });
@@ -765,6 +819,7 @@ export const useStore = create<AppState>()(
         });
         if (newBadges.length > 0) {
           get().addToast({ message: `${newBadges[0].emoji} Badge unlocked: ${newBadges[0].name}!`, type: 'info' });
+          syncBadgesToSupabase(activePlayer, newBadges);
         }
         if (nextMilestone) get().addToast({ message: nextMilestone.message, type: 'info' });
         if (streakBonus > 0) get().addToast({ message: `🔥 3-day streak! +${streakBonus} bonus pts`, type: 'info' });
@@ -994,6 +1049,7 @@ export const useStore = create<AppState>()(
             message: `${newBadges[0].emoji} Badge unlocked: ${newBadges[0].name}!`,
             type: 'info',
           });
+          syncBadgesToSupabase(activePlayer, newBadges);
         }
         get().incrementConfetti();
       },
@@ -1080,14 +1136,38 @@ export const useStore = create<AppState>()(
       },
 
       deleteGoal: (id) => {
-        set(s => ({ goals: s.goals.filter(g => g.id !== id) }));
-        if (SUPABASE_ENABLED) {
-          (async () => {
-            try {
-              await supabase.from('goals').delete().eq('id', id);
-            } catch (err: any) { console.error('Supabase deleteGoal:', err); }
-          })();
-        }
+        const goal = get().goals.find(g => g.id === id);
+        set(s => {
+          const goals = s.goals.filter(g => g.id !== id);
+          if (goal?.completed && goal.completedBy) {
+            const player = goal.completedBy;
+            const newScore = {
+              ...s.scores[player],
+              totalPoints: Math.max(0, s.scores[player].totalPoints - goal.points),
+              tasksCompleted: Math.max(0, s.scores[player].tasksCompleted - 1),
+            };
+            if (SUPABASE_ENABLED) {
+              (async () => {
+                try {
+                  await supabase.from('goals').delete().eq('id', id);
+                  await supabase.from('player_scores').update({
+                    total_points: newScore.totalPoints,
+                    tasks_completed: newScore.tasksCompleted,
+                  }).eq('player', player);
+                } catch (err: any) { console.error('Supabase deleteGoal:', err); }
+              })();
+            }
+            return { goals, scores: { ...s.scores, [player]: newScore } };
+          }
+          if (SUPABASE_ENABLED) {
+            (async () => {
+              try {
+                await supabase.from('goals').delete().eq('id', id);
+              } catch (err: any) { console.error('Supabase deleteGoal:', err); }
+            })();
+          }
+          return { goals };
+        });
       },
 
       completeGoal: (id) => {
@@ -1147,6 +1227,7 @@ export const useStore = create<AppState>()(
               message: `${newBadges[0].emoji} Badge unlocked: ${newBadges[0].name}!`,
               type: 'info',
             });
+            syncBadgesToSupabase(activePlayer, newBadges);
           }
           get().incrementConfetti();
         } else {
@@ -1219,9 +1300,10 @@ export const useStore = create<AppState>()(
 
       assignGoal: (goalId, assignTo) => {
         const { activePlayer } = get();
+        const isSelf = assignTo === activePlayer;
         set(s => ({
           goals: s.goals.map(g =>
-            g.id === goalId ? { ...g, claimedBy: assignTo, assignedBy: activePlayer, assignedToBoth: false } : g
+            g.id === goalId ? { ...g, claimedBy: assignTo, assignedBy: isSelf ? undefined : activePlayer, assignedToBoth: false } : g
           ),
         }));
         if (SUPABASE_ENABLED) {
@@ -1229,13 +1311,14 @@ export const useStore = create<AppState>()(
             try {
               await supabase.from('goals').update({
                 claimed_by: assignTo,
-                assigned_by: activePlayer,
+                assigned_by: isSelf ? null : activePlayer,
                 assigned_to_both: false,
               } as any).eq('id', goalId);
             } catch (err: any) { console.error('Supabase assignGoal:', err); }
           })();
         }
-        get().addToast({ message: `Goal assigned to ${assignTo}`, type: 'info' });
+        const assigneeName = isSelf ? 'yourself' : assignTo === 'johnathan' ? 'Johnathan' : 'Jordyn';
+        get().addToast({ message: `Goal assigned to ${assigneeName}`, type: 'info' });
       },
 
       assignGoalToBoth: (goalId) => {
@@ -1432,6 +1515,70 @@ export const useStore = create<AppState>()(
 
       removeToast: (id) => set(s => ({ toasts: s.toasts.filter(t => t.id !== id) })),
 
+      startContraction: () => {
+        const active = get().contractions.find(c => !c.endTime);
+        if (active) return;
+        const contraction: Contraction = { id: generateId(), startTime: new Date().toISOString() };
+        set(s => ({ contractions: [...s.contractions, contraction] }));
+        if (SUPABASE_ENABLED) {
+          (async () => {
+            try {
+              await supabase.from('contractions').insert({
+                id: contraction.id,
+                start_time: contraction.startTime,
+              } as any);
+            } catch (err) { console.error('Supabase startContraction:', err); }
+          })();
+        }
+      },
+
+      stopContraction: () => {
+        const active = get().contractions.find(c => !c.endTime);
+        if (!active) return;
+        const now = new Date().toISOString();
+        const duration = Math.round((new Date(now).getTime() - new Date(active.startTime).getTime()) / 1000);
+        set(s => ({
+          contractions: s.contractions.map(c =>
+            c.id === active.id ? { ...c, endTime: now, duration } : c
+          ),
+        }));
+        if (SUPABASE_ENABLED) {
+          (async () => {
+            try {
+              await supabase.from('contractions').update({
+                end_time: now,
+                duration_seconds: duration,
+              } as any).eq('id', active.id);
+            } catch (err) { console.error('Supabase stopContraction:', err); }
+          })();
+        }
+      },
+
+      deleteContraction: (id) => {
+        set(s => ({ contractions: s.contractions.filter(c => c.id !== id) }));
+        if (SUPABASE_ENABLED) {
+          (async () => {
+            try { await supabase.from('contractions').delete().eq('id', id); }
+            catch (err) { console.error('Supabase deleteContraction:', err); }
+          })();
+        }
+      },
+
+      clearContractions: () => {
+        const ids = get().contractions.map(c => c.id);
+        set({ contractions: [] });
+        if (SUPABASE_ENABLED && ids.length > 0) {
+          (async () => {
+            try { await supabase.from('contractions').delete().in('id', ids); }
+            catch (err) { console.error('Supabase clearContractions:', err); }
+          })();
+        }
+      },
+
+      updateContractionSettings: (updates) => {
+        set(s => ({ contractionSettings: { ...s.contractionSettings, ...updates } }));
+      },
+
       updateSettings: (updates) => {
         set(s => {
           const next = { ...s.settings, ...updates };
@@ -1466,6 +1613,8 @@ export const useStore = create<AppState>()(
         settings: state.settings,
         activePlayer: state.activePlayer,
         previousMilestone: state.previousMilestone,
+        contractions: state.contractions,
+        contractionSettings: state.contractionSettings,
       }),
       merge: (persisted: any, current) => {
         const ensureBadges = (scores: any) => {

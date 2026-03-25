@@ -1,4 +1,4 @@
-import { LayoutDashboard, CheckSquare, ShoppingCart, Target, ClipboardList } from 'lucide-react';
+import { LayoutDashboard, CheckSquare, ShoppingCart, Target, ClipboardList, Timer } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import type { NavTab } from '../types';
 
@@ -8,6 +8,7 @@ const NAV_ITEMS: { tab: NavTab; icon: React.ReactNode; label: string }[] = [
   { tab: 'shopping', icon: <ShoppingCart className="w-5 h-5" />, label: 'Shop' },
   { tab: 'goals', icon: <Target className="w-5 h-5" />, label: 'Goals' },
   { tab: 'assigned', icon: <ClipboardList className="w-5 h-5" />, label: 'Assigned' },
+  { tab: 'contractions', icon: <Timer className="w-5 h-5" />, label: 'Timer' },
 ];
 
 export default function BottomNav() {
@@ -33,7 +34,7 @@ export default function BottomNav() {
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
-              className={`flex flex-col items-center gap-1 py-3 px-3 relative transition-colors duration-150 ${
+              className={`flex flex-col items-center gap-1 py-3 px-1.5 relative transition-colors duration-150 ${
                 isActive ? 'text-sage-500' : 'text-warm-gray'
               }`}
             >

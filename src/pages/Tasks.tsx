@@ -36,7 +36,7 @@ function TaskForm({ initial, onSave, onCancel }: TaskFormProps) {
     let claimedBy: Player | undefined;
     let assignedBy: Player | undefined;
     let assignedToBoth = false;
-    if (assignTo === 'me') { claimedBy = activePlayer; assignedBy = activePlayer; }
+    if (assignTo === 'me') { claimedBy = activePlayer; }
     else if (assignTo === 'other') { claimedBy = otherPlayer; assignedBy = activePlayer; }
     else if (assignTo === 'both') { assignedToBoth = true; }
     onSave({
